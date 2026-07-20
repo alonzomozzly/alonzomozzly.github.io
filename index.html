@@ -47,8 +47,12 @@
 /* Монолит — очень тёмно-серый с серебристым отливом */
 :root.accent-mono{
   --accent-1:#5a5e66; --accent-2:#2b2d32; --accent:#3a3d43; --accent-soft:#e9eaee; --on-accent:#ffffff;
+  --text:#17171a; --text-secondary:#3a3d43; --bg:#f4f4f7; --card:#ffffff;
 }
-:root.dark.accent-mono{ --accent-soft:#232428; --accent:#9aa1ab; --accent-1:#787d86; --accent-2:#4a4d54; }
+:root.dark.accent-mono{
+  --accent-soft:#232428; --accent:#9aa1ab; --accent-1:#787d86; --accent-2:#b0b5bd;
+  --text:#f5f5f7; --text-secondary:#9aa1ab; --bg:#0a0a0c; --card:#17171b;
+}
 :root.accent-mono .btn-primary{ box-shadow:0 10px 24px -8px rgba(15,17,20,.5); }
 :root.accent-mono .action-btn.primary{
   background:linear-gradient(115deg,#54575f 0%, #2a2c31 36%, #ffffff 50%, #2a2c31 64%, #1b1d21 100%);
@@ -66,14 +70,15 @@ body{
 }
 #app{ max-width:480px; margin:0 auto; min-height:100vh; position:relative; padding-bottom:96px; }
 #app.appear{ animation:appIn .6s var(--ease-out) both; }
-@keyframes appIn{ from{ opacity:0; filter:blur(14px); transform:scale(1.03); } to{ opacity:1; filter:blur(0); transform:none; } }
+@keyframes appIn{ from{ opacity:0; transform:scale(1.04); } to{ opacity:1; transform:none; } }
 button{ font-family:inherit; }
 input,textarea,select{ font-family:inherit; }
 .hidden{ display:none !important; }
 
 /* ---------- Живые нажатия ---------- */
 button, .pressable{ transition:transform .4s var(--spring), box-shadow .4s var(--spring), opacity .2s ease, background .3s ease; touch-action:manipulation; }
-html, body{ overscroll-behavior:none; }
+html{ overscroll-behavior-x:none; }
+body{ overscroll-behavior-y:auto; overscroll-behavior-x:none; }
 @media (max-width:520px){
   html.lg .card::after, html.lg .action-btn:not(.primary)::after{ display:none; }
 }
@@ -162,7 +167,7 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .macros-row{ display:flex; gap:10px; margin-top:18px; }
 .macro-pill{ flex:1; background:var(--card); border-radius:16px; padding:12px 10px; text-align:center; box-shadow:var(--shadow); }
 .macro-val{ font-size:16px; font-weight:800; }
-.macro-goal{ font-size:12px; font-weight:600; color:var(--text-tertiary); }
+.macro-goal{ font-size:12px; font-weight:600; color:var(--text); opacity:.45; }
 .macro-lbl{ font-size:11.5px; color:var(--text-secondary); margin-top:2px; font-weight:600; }
 .protein-hint{ margin-top:10px; text-align:center; font-size:13px; font-weight:700; }
 
@@ -186,7 +191,7 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .advice-card{ margin-top:20px; border-radius:var(--radius); background:var(--card); padding:18px; box-shadow:var(--shadow); }
 .advice-head{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-secondary); margin-bottom:8px; }
 .advice-dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); animation:pulseDot 2.4s ease-in-out infinite; }
-.act-quote{ color:var(--on-accent) !important; }
+.act-quote{ color:inherit !important; }
 @keyframes pulseDot{ 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.5; transform:scale(.82);} }
 .advice-text{ font-size:15px; line-height:1.45; font-weight:600; }
 .warn-card{ margin-top:12px; border-radius:18px; padding:14px 16px; background:var(--accent-soft); color:var(--accent-2); font-size:13.5px; font-weight:700; line-height:1.45; display:flex; align-items:flex-start; gap:12px; }
@@ -1812,7 +1817,7 @@ function renderFoodTabBody(){
       <input class="search-input" id="foodSearch" type="text" placeholder="Курица, гречка, творог…" autocomplete="off">
       <div id="searchResults"></div>`;
     const inp = document.getElementById('foodSearch');
-    inp.oninput = ()=>{ clearTimeout(inp._t); inp._t = setTimeout(()=>doFoodSearch(inp.value), 250); };
+    inp.oninput = ()=>{ clearTimeout(inp._t); inp._t = setTimeout(()=>doFoodSearch(inp.value), 80); };
     doFoodSearch('');
   }
   else if(foodTab==='recent'){
@@ -1837,7 +1842,7 @@ function renderFoodTabBody(){
       <div class="field-label">Новое блюдо (на 100 г)</div>
       <input class="plain-input" id="cfName" type="text" placeholder="Название" style="margin-bottom:8px">
       <div class="import-row2">
-        <input class="plain-input" id="cfKcal" type="number" inputmode="decimal" placeholder="ккал*">
+        <input class="plain-input" id="cfKcal" type="number" inputmode="decimal" placeholder="ккал (авто — или введи сам)">
         <input class="plain-input" id="cfP" type="number" inputmode="decimal" placeholder="Б, г">
         <input class="plain-input" id="cfC" type="number" inputmode="decimal" placeholder="У, г">
         <input class="plain-input" id="cfF" type="number" inputmode="decimal" placeholder="Ж, г">
@@ -1847,15 +1852,23 @@ function renderFoodTabBody(){
       ${S.customFoods.length
         ? S.customFoods.map((f,i)=>`<div style="position:relative">${foodResultHtml(f)}<button class="log-del" style="position:absolute;right:46px;top:50%;transform:translateY(-50%)" data-act="delCustomFood" data-arg="${i}">×</button></div>`).join('')
         : '<div class="empty-hint">Сохранённых блюд пока нет</div>'}`;
+    bindCustomFoodForm();
   }
 }
 
 let offAbort = 0;
+function foodMatchesQuery(food, q){
+  if(!q) return true;
+  const name = food.name.toLowerCase();
+  /* Разбиваем на слова: все слова должны встречаться в названии */
+  const words = q.split(/\s+/).filter(Boolean);
+  return words.every(w => name.includes(w));
+}
 function doFoodSearch(q){
   const box = document.getElementById('searchResults');
   if(!box) return;
   q = (q||'').trim().toLowerCase();
-  const local = FOOD_DB.concat(S.customFoods).filter(f=>!q || f.name.toLowerCase().includes(q));
+  const local = FOOD_DB.concat(S.customFoods).filter(f=>foodMatchesQuery(f, q));
   const ranked = rankFoods(local).slice(0, q? 30 : 15);
   /* Всегда показываем локальную базу */
   box.innerHTML = (ranked.length
@@ -1880,10 +1893,30 @@ function doFoodSearch(q){
   }
 }
 
+function autoCalcKcal(){
+  const p = parseFloat(document.getElementById('cfP')?.value)||0;
+  const c = parseFloat(document.getElementById('cfC')?.value)||0;
+  const f = parseFloat(document.getElementById('cfF')?.value)||0;
+  if(p+c+f>0){
+    const calc = Math.round(p*4 + c*4 + f*9);
+    const kEl = document.getElementById('cfKcal');
+    if(kEl && !kEl._manualEdit) kEl.value = calc;
+  }
+}
+function bindCustomFoodForm(){
+  ['cfP','cfC','cfF'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.oninput = autoCalcKcal;
+  });
+  const kEl = document.getElementById('cfKcal');
+  if(kEl) kEl.oninput = ()=>{ kEl._manualEdit = kEl.value.trim()!==''; };
+}
 ACTIONS.saveCustomFood = ()=>{
   const name = document.getElementById('cfName').value.trim();
+  autoCalcKcal();
   const kcal = parseFloat(document.getElementById('cfKcal').value);
-  if(!name || !(kcal>0)){ showToast('Нужны название и калорийность'); return; }
+  if(!name){ showToast('Введи название блюда'); return; }
+  if(!(kcal>0)){ showToast('Нужны калории — введи БЖУ или ккал вручную'); return; }
   const p = parseFloat(document.getElementById('cfP').value)||0;
   const c = parseFloat(document.getElementById('cfC').value)||0;
   const f = parseFloat(document.getElementById('cfF').value)||0;
@@ -1902,7 +1935,7 @@ ACTIONS.pickFood = (arg)=>{
   if(pickedFood.fixed && !pickedFood.per100){ addPickedToLog(null); return; }
   openSheet(`
     <div class="sheet-title" style="padding-right:30px">${pickedFood.emoji||'🍽'} ${escapeHtml(pickedFood.name)}</div>
-    <div class="field-label">Сколько грамм?</div>
+    <div class="field-label">��колько грамм?</div>
     <div class="gram-pills">${[50,100,150,200,300].map(g=>`<button class="pill ${g===100?'active':''}" data-g="${g}">${g} г</button>`).join('')}</div>
     <input class="plain-input" id="gramInput" type="number" inputmode="numeric" value="100" style="margin-top:10px">
     <div class="kcal-preview" id="gramPreview"></div>
