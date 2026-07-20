@@ -61,16 +61,22 @@
 :root.accent-mono .action-btn.primary .action-icon{ color:#fff; }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body{ height:100%; }
+html,body{ height:100%; margin:0; }
 body{
-  margin:0; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','SF Pro',system-ui,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro',system-ui,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
   font-feature-settings:'kern' 1; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   background:var(--bg); color:var(--text); overscroll-behavior:none;
   transition:background .4s ease, color .4s ease;
+  display:flex; flex-direction:column; align-items:center;
 }
-#app{ max-width:480px; margin:0 auto; min-height:100vh; position:relative; padding-bottom:96px; }
-#app.appear{ animation:appIn .6s var(--ease-out) both; }
-@keyframes appIn{ from{ opacity:0; transform:scale(1.04); } to{ opacity:1; transform:none; } }
+#app{
+  width:100%; max-width:480px; flex:1;
+  display:flex; flex-direction:column;
+  min-height:0; /* важно для flex-scroll */
+}
+#app.appear{ animation:appIn .5s var(--ease-out) both; }
+@keyframes appIn{ from{ opacity:0; } to{ opacity:1; } }
+#mainContent{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; }
 button{ font-family:inherit; }
 input,textarea,select{ font-family:inherit; }
 .hidden{ display:none !important; }
@@ -293,9 +299,10 @@ input[type=range].hard-slider::-webkit-slider-thumb{ -webkit-appearance:none; wi
 
 /* ---------- Нижняя навигация ---------- */
 .bottom-nav{
-  position:fixed; bottom:0; left:0; right:0; max-width:480px; margin:0 auto;
+  flex-shrink:0;
   background:var(--bg-elevated); border-top:1px solid var(--divider);
   display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom)); z-index:40;
+  width:100%;
 }
 .nav-item{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; border:none; background:none; padding:7px 0; cursor:pointer; color:var(--text-tertiary); }
 .nav-item svg{ width:23px; height:23px; transition:transform .45s var(--spring); }
@@ -1216,9 +1223,9 @@ function renderMain(){
   ui.tab = ui.tab || 'home';
   app.innerHTML = `
     <div id="mainContent"></div>
-    <div class="bottom-nav">
+    <nav class="bottom-nav" id="bottomNav">
       ${NAV.map(n=>`<button class="nav-item" data-tab="${n.t}">${ic(n.i)}<span class="nav-label">${n.l}</span></button>`).join('')}
-    </div>
+    </nav>
     <div class="sheet-overlay" id="sheetOverlay"><div class="sheet" id="sheetContent"></div></div>`;
   document.querySelectorAll('.nav-item').forEach(el=>{ el.onclick = ()=>{ if(ui.tab!==el.dataset.tab){ haptic('light'); ui.tab = el.dataset.tab; renderTab(); } }; });
   document.getElementById('sheetOverlay').onclick = (e)=>{ if(e.target.id==='sheetOverlay') closeSheet(); };
@@ -1250,6 +1257,8 @@ function renderMain(){
 
 function renderTab(){
   document.querySelectorAll('.nav-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===ui.tab));
+  const bnav = document.getElementById('bottomNav');
+  if(bnav) bnav.querySelectorAll('.nav-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===ui.tab));
   const c = document.getElementById('mainContent');
   const tab = TABS[ui.tab] || TABS.home;
   c.innerHTML = tab.html();
@@ -1282,8 +1291,14 @@ function renderHome(){
   const missingP = targetProtein - protein;
   const hour = new Date().getHours();
   let warn = '';
-  if(hasEaten && hour>=18 && (goal - consumed - burned) > 900) warn = `<div class="warn-card red rise"><span class="warn-ic">!</span><span>Пока что дефицит выходит слишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
-  else if(consumed > goal + 250) warn = `<div class="warn-card rise"><span class="warn-ic">!</span><span>Сегодня ${consumed - goal} ккал сверх нормы. Ничего страшного — просто вернись в ритм завтра</span></div>`;
+  const warnKey = `warnDismissed_${todayStr()}`;
+  const warnDismissed = sessionStorage.getItem(warnKey);
+  if(!warnDismissed){
+    if(hasEaten && hour>=18 && (goal - consumed - burned) > 900)
+      warn = `<div class="warn-card red rise" id="warnCard"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Пока что дефицит выходит слишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
+    else if(consumed > goal + 250)
+      warn = `<div class="warn-card rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Сегодня ${consumed - goal} ккал сверх нормы. Ничего страшного — просто вернись в ритм завтра</span></div>`;
+  }
 
   return `
     <div class="topbar">
@@ -1817,7 +1832,8 @@ function renderFoodTabBody(){
       <input class="search-input" id="foodSearch" type="text" placeholder="Курица, гречка, творог…" autocomplete="off">
       <div id="searchResults"></div>`;
     const inp = document.getElementById('foodSearch');
-    inp.oninput = ()=>{ clearTimeout(inp._t); inp._t = setTimeout(()=>doFoodSearch(inp.value), 80); };
+    inp.oninput = ()=>{ doFoodSearch(inp.value); };
+    inp.addEventListener('input', ()=>{ doFoodSearch(inp.value); }, {passive:true});
     doFoodSearch('');
   }
   else if(foodTab==='recent'){
@@ -2046,7 +2062,7 @@ async function startScanner(){
         if(hits>=3){ stopScanner(); handleBarcode(code); }
       });
     });
-  }catch(e){ if(status) status.textContent = 'Нет доступа к камере — введи код вручную'; }
+  }catch(e){ if(status) status.textContent = 'Нет доступа к камере — введи ��од вручную'; }
 }
 ACTIONS.manualBarcode = ()=>{
   const code = document.getElementById('manualCode').value.trim();
