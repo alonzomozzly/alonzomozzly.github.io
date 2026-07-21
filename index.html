@@ -89,7 +89,8 @@
 :root.accent-mono .action-btn.primary .action-icon{ color:#fff; }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body{ height:100%; margin:0; }
+html{ height:100%; margin:0; }
+body{ height:var(--tg-viewport-stable-height, 100%); min-height:0; margin:0; }
 body{
   font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro',system-ui,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
   font-feature-settings:'kern' 1; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
@@ -104,7 +105,7 @@ body{
 }
 #app.appear{ animation:appIn .5s var(--ease-out) both; }
 @keyframes appIn{ from{ opacity:0; } to{ opacity:1; } }
-#mainContent{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; }
+#mainContent{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; }
 button{ font-family:inherit; }
 input,textarea,select{ font-family:inherit; }
 .hidden{ display:none !important; }
@@ -255,7 +256,7 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .section-title{ font-size:20px; font-weight:800; margin:18px 0 12px; letter-spacing:-.01em; }
 .card{ background:var(--card); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); position:relative; }
 .card + .card{ margin-top:12px; }
-.log-item{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--divider); }
+.log-item{ cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--divider); }
 .log-item:last-child{ border-bottom:none; }
 .log-emoji{ width:38px; height:38px; border-radius:12px; background:var(--card-2); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
 .log-name{ font-size:14.5px; font-weight:600; }
@@ -301,7 +302,7 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 /* ---------- Активность ---------- */
 .act-hero{ display:flex; gap:14px; align-items:stretch; margin-top:8px; }
 .steps-card{ flex:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
-.train-card{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; }
+.train-card{ flex:1; align-self:stretch; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
 .train-icon{ width:54px; height:54px; border-radius:18px; background:var(--chip); color:var(--chip-text); display:flex; align-items:center; justify-content:center; }
 .train-icon svg{ width:26px; height:26px; }
 .steps-ring-holder{ position:relative; width:148px; height:148px; margin:0 auto; }
@@ -684,7 +685,7 @@ let S = {
   profile:null,        // {gender,age,height,weight,activity,goal,name,targetWeight,calorieAdjust}
   foodLog:{},          // {'YYYY-MM-DD':[{name,kcal,p,c,f,na,k,emoji,time,imported?}]}
   weightLog:[],        // [{date,weight}]
-  customFoods:[],      // «Своё блюдо��
+  customFoods:[],      // «Своё блюдо»
   foodFreq:{},         // частота выбора: {key:{n,last,food}}
   waterLog:{},         // {'YYYY-MM-DD': ml}
   stepsLog:{},         // {'YYYY-MM-DD': steps}
@@ -778,7 +779,7 @@ const FOOD_DB = [
   {name:'Ряженка 2.5%', emoji:'🥛', per100:{kcal:54,p:2.9,c:4.2,f:2.5,na:50,k:146}},
   {name:'Молоко 3.2%', emoji:'🥛', per100:{kcal:59,p:2.9,c:4.7,f:3.2,na:44,k:146}},
   {name:'Йогурт питьевой сладкий', emoji:'🥛', per100:{kcal:70,p:2.8,c:11,f:1.5,na:45,k:140}},
-  {name:'М����царелла', emoji:'🧀', per100:{kcal:280,p:18,c:2,f:22,na:500,k:76}},
+  {name:'Моцарелла', emoji:'🧀', per100:{kcal:280,p:18,c:2,f:22,na:500,k:76}},
   {name:'Сыр плавленый', emoji:'🧀', per100:{kcal:290,p:12,c:5,f:25,na:1000,k:150}},
   {name:'Сыр творожный сливочный', emoji:'🧀', per100:{kcal:290,p:6,c:4,f:28,na:350,k:110}},
   {name:'Брынза', emoji:'🧀', per100:{kcal:260,p:17,c:0.5,f:21,na:1100,k:95}},
@@ -825,7 +826,7 @@ const FOOD_DB = [
   {name:'Зелень (укроп, петрушка)', emoji:'🌿', per100:{kcal:40,p:3,c:7,f:0.6,na:50,k:600}},
   {name:'Шампиньоны жареные', emoji:'🍄', per100:{kcal:50,p:3.5,c:2,f:3,na:10,k:420}},
   {name:'Кукуруза консервированная', emoji:'🌽', per100:{kcal:88,p:2.7,c:18,f:1,na:280,k:190}},
-  {name:'��елёный горошек', emoji:'🫘', per100:{kcal:73,p:5,c:12,f:0.4,na:260,k:130}},
+  {name:'Зелёный горошек', emoji:'🫘', per100:{kcal:73,p:5,c:12,f:0.4,na:260,k:130}},
   /* фрукты и ягоды */
   {name:'Апельсин', emoji:'🍊', per100:{kcal:47,p:0.9,c:12,f:0.1,na:0,k:181}},
   {name:'Мандарин', emoji:'🍊', per100:{kcal:53,p:0.8,c:13,f:0.3,na:2,k:166}},
@@ -843,7 +844,7 @@ const FOOD_DB = [
   {name:'Хурма', emoji:'🍊', per100:{kcal:67,p:0.5,c:17,f:0.4,na:1,k:200}},
   {name:'Манго', emoji:'🥭', per100:{kcal:60,p:0.8,c:15,f:0.4,na:1,k:168}},
   {name:'Грейпфрут', emoji:'🍊', per100:{kcal:42,p:0.8,c:11,f:0.1,na:0,k:135}},
-  {name:'��урага', emoji:'🍑', per100:{kcal:241,p:3.4,c:63,f:0.5,na:10,k:1160}},
+  {name:'Курага', emoji:'🍑', per100:{kcal:241,p:3.4,c:63,f:0.5,na:10,k:1160}},
   {name:'Чернослив', emoji:'🫐', per100:{kcal:240,p:2.2,c:64,f:0.4,na:2,k:730}},
   {name:'Изюм', emoji:'🍇', per100:{kcal:299,p:3.1,c:79,f:0.5,na:11,k:750}},
   {name:'Финики', emoji:'🌴', per100:{kcal:277,p:1.8,c:75,f:0.2,na:1,k:696}},
@@ -900,7 +901,7 @@ const FOOD_DB = [
   {name:'Масло оливковое', emoji:'🫒', per100:{kcal:884,p:0,c:0,f:100,na:2,k:1}},
   {name:'Масло подсолнечное', emoji:'🌻', per100:{kcal:899,p:0,c:0,f:100,na:0,k:0}},
   {name:'Горчица', emoji:'🍯', per100:{kcal:160,p:9.9,c:13,f:6.4,na:1100,k:450}},
-  {name:'Хумус', emoji:'��', per100:{kcal:240,p:8,c:14,f:17,na:380,k:230}},
+  {name:'Хумус', emoji:'🧆', per100:{kcal:240,p:8,c:14,f:17,na:380,k:230}},
   {name:'Тофу', emoji:'🧈', per100:{kcal:76,p:8,c:1.9,f:4.8,na:7,k:120}},
   {name:'Протеин сывороточный (порошок)', emoji:'🥤', per100:{kcal:380,p:75,c:8,f:5,na:200,k:500}},
 ];
@@ -976,12 +977,16 @@ async function publishFood(food){
 }
 
 /* ================= Калории и расчёты ================= */
-function bmr(p){ const base = 10*p.weight + 6.25*p.height - 5*p.age; return p.gender==='male' ? base+5 : base-161; }
-const ACTIVITY_MULT = { low:1.2, medium:1.375, high:1.55 };
-function tdee(p){ return bmr(p) * ACTIVITY_MULT[p.activity]; }
-const GOAL_DEFICIT = { maintain:0, slow:200, moderate:500, fast:700 };
-const GOAL_RATE_KG_WEEK = { maintain:0, slow:0.2, moderate:0.5, fast:0.75 };
-function goalCalories(p){ const t = tdee(p) - GOAL_DEFICIT[p.goal] + (p.calorieAdjust||0); return Math.round(t/10)*10; }
+/* базовый обмен — формула Миффлина-Сан Жеора */
+function bmr(p){ return p.gender==='male'
+  ? 88.36 + 13.4*p.weight + 4.8*p.height - 5.7*p.age
+  : 447.6 + 9.2*p.weight + 3.1*p.height - 4.3*p.age; }
+const ACTIVITY_MULT = { min:1.2, low:1.375, medium:1.55, high:1.725, athlete:1.9 };
+function tdee(p){ return bmr(p) * (ACTIVITY_MULT[p.activity] || 1.375); }
+/* дефицит в процентах от нормы */
+const GOAL_PCT = { maintain:0, slow:0.10, moderate:0.20, fast:0.28 };
+function goalRateKgWeek(p){ return Math.round(tdee(p)*(GOAL_PCT[p.goal]||0)*7/7700*20)/20; }
+function goalCalories(p){ const t = tdee(p)*(1-(GOAL_PCT[p.goal]||0)) + (p.calorieAdjust||0); return Math.round(t/10)*10; }
 
 function dayItems(ds){ return S.foodLog[ds] || []; }
 function dayTotal(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.kcal||0),0)); }
@@ -1156,6 +1161,8 @@ async function init(){
     if(loaded && typeof loaded==='object') S = Object.assign(S, loaded);
   }catch(e){}
   if(!S.profile && params.get('demo')==='1') seedDemo();
+  /* миграция старых уровней активности на новую шкалу */
+  if(S.profile && !S.profile.actV2){ const remap = {low:'min', medium:'low', high:'medium'}; if(remap[S.profile.activity]) S.profile.activity = remap[S.profile.activity]; S.profile.actV2 = 1; }
   if(params.get('dark')==='1') S.theme.dark = true; // служебное: предпросмотр тёмной темы
   if(params.get('accent')) S.theme.accent = params.get('accent'); // служебное: предпросмотр акцента
   applyTheme();
@@ -1217,9 +1224,10 @@ function renderOnboarding(step){
   }
   else if(step===4){
     const opts = [
-      {k:'low', t:'Слабый', d:'Сидячая работа, до 5 000 шагов в день, тренировок почти нет'},
-      {k:'medium', t:'Умеренный', d:'Есть прогулки и 5 000–10 000 шагов, 1–3 тренировки в неделю'},
-      {k:'high', t:'Высокий', d:'Активная работа или спорт, более 10 000 шагов, 4+ тренировки в неделю'},
+      {k:'min', t:'Минимальный', d:'Сидячая работа, минимум шагов, тренировок нет'},
+      {k:'low', t:'Слабый', d:'Лёгкая активность: прогулки, 1–3 тренировки в неделю'},
+      {k:'medium', t:'Умеренный', d:'Тренировки 3–5 раз в неделю, много движения днём'},
+      {k:'high', t:'Высокий', d:'Интенсивные тренировки 6–7 раз в неделю или физическая работа'},
     ];
     body = `
       <div class="ob-title">Твой уровень активности?</div>
@@ -1231,12 +1239,12 @@ function renderOnboarding(step){
   }
   else if(step===5){
     const draftP = {gender:obDraft.gender||'male', age:obDraft.age, height:obDraft.height||170, weight:obDraft.weight||70, activity:obDraft.activity||'medium'};
-    const t = Math.round(tdee(draftP)/10)*10;
+    const rk = x=>Math.round(tdee(draftP)*x/10)*10;
     const goals = [
-      {k:'maintain', t:'Поддерживать вес', kcal:t},
-      {k:'slow', t:'Худеть медленно', kcal:t-200},
-      {k:'moderate', t:'Худеть умеренно', kcal:t-500, hot:true},
-      {k:'fast', t:'Худеть быстро', kcal:t-700},
+      {k:'maintain', t:'Поддерживать вес', kcal:rk(1)},
+      {k:'slow', t:'Худеть медленно', kcal:rk(0.90)},
+      {k:'moderate', t:'Худеть умеренно', kcal:rk(0.80), hot:true},
+      {k:'fast', t:'Худеть быстро', kcal:rk(0.72)},
     ];
     body = `
       <div class="ob-title">Какая твоя цель?</div>
@@ -1398,7 +1406,7 @@ function renderHome(){
   const si = streakInfo();
   const circumference = 2*Math.PI*95;
   const dash = circumference*(1-pct);
-  const rateWeek = GOAL_RATE_KG_WEEK[p.goal];
+  const rateWeek = goalRateKgWeek(p);
   const advice = getSmartAdvice();
   const targetProtein = Math.round(p.weight*2.0);
   const targetFat = Math.round(p.weight*0.9);
@@ -1507,7 +1515,7 @@ function getSmartAdvice(){
     return `К вечеру выпито только ${(water/1000).toFixed(1)} л из ${(norm/1000).toFixed(1)} л. Равномерно добери норму, но не заливай всё перед сном`;
   const steps3 = lastDays(3).reduce((s,x)=>s+daySteps(x),0)/3;
   if(steps3 < 4000)
-    return `Шаго�� в последние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
+    return `Шагов в последние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
   const si = streakInfo();
   return `Ты на верном пути${si.display>1?` — уже ${si.display}-й день подряд`:''}. Держи белок около ${targetProtein} г, соль до ${SALT_LIMIT} г и не пропускай шаги`;
 }
@@ -1681,7 +1689,7 @@ function renderActivityTab(){
           </div>
           <div class="steps-goal">цель ${STEPS_GOAL.toLocaleString('ru-RU')}${stepsKcal(ds)>0?' · ≈ '+stepsKcal(ds)+' ккал':''}</div>
           <div class="steps-btns">
-            <button class="mini-btn" data-act="syncSteps">${ic('walk')} Датчики</button>
+            <button class="mini-btn" data-act="importSteps">${ic('walk')} Health / Fitness</button>
             <button class="mini-btn" data-act="editSteps">Ввести</button>
           </div>
         </div>
@@ -1714,7 +1722,7 @@ ACTIONS.delWorkout = (arg)=>{
 ACTIONS.editSteps = ()=>{
   openModal(`
     <div class="modal-title">Шаги за сегодня</div>
-    <div class="modal-text">Посмотри число шагов в приложении «Здоровье» (Apple Health) или Google Fit и введи его сюда — Telegram не даёт мини-приложениям прямой доступ к Health</div>
+    <div class="modal-text">Введи число шагов за сегодня — расход калорий пересчитается автоматически</div>
     <input class="plain-input" id="stepsInput" type="number" inputmode="numeric" placeholder="${daySteps(todayStr())||8000}" style="margin-top:12px">
     <button class="btn-primary" style="margin-top:14px" data-act="saveSteps">Сохранить</button>`);
 };
@@ -1725,36 +1733,14 @@ ACTIONS.saveSteps = ()=>{
   save(); closeModal(); renderTab(); haptic('ok');
 };
 
-/* шагомер на датчиках движения (считает, пока приложение открыто) */
-let motionOn = false, lastStepT = 0, lastMag = 9.8;
-function onMotion(e){
-  const a = e.accelerationIncludingGravity;
-  if(!a) return;
-  const mag = Math.sqrt((a.x||0)**2 + (a.y||0)**2 + (a.z||0)**2);
-  const now = Date.now();
-  if(mag - lastMag > 2.2 && now - lastStepT > 350){
-    lastStepT = now;
-    const ds = todayStr();
-    S.stepsLog[ds] = (S.stepsLog[ds]||0) + 1;
-    save();
-    const el = document.querySelector('.steps-num');
-    if(el) el.textContent = S.stepsLog[ds].toLocaleString('ru-RU');
-  }
-  lastMag = lastMag*0.7 + mag*0.3;
-}
-ACTIONS.syncSteps = async ()=>{
-  try{
-    if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
-      const perm = await DeviceMotionEvent.requestPermission(); // запрос разрешения на iPhone
-      if(perm !== 'granted'){ showToast('Доступ к датчикам не разрешён'); return; }
-    }
-    if(!motionOn){
-      window.addEventListener('devicemotion', onMotion);
-      motionOn = true;
-    }
-    showToast('Датчики подключены — шаги считаются, пока приложение открыто');
-    haptic('ok');
-  }catch(e){ showToast('Датчики движения недоступны — введи шаги вручную'); }
+/* импорт шагов из Apple Health / Fitness */
+ACTIONS.importSteps = ()=>{
+  openModal(`
+    <div class="modal-title">Импорт из Health / Fitness</div>
+    <div class="modal-text">1. Открой «Здоровье» (Health) или «Фитнес» (Fitness) на iPhone<br>2. Посмотри число шагов за сегодня<br>3. Введи его сюда — расход калорий пересчитается автоматически</div>
+    <input class="plain-input" id="stepsInput" type="number" inputmode="numeric" placeholder="${daySteps(todayStr())||8000}" style="margin-top:12px">
+    <button class="btn-primary" style="margin-top:14px" data-act="saveSteps">Импортировать</button>
+    <div class="settings-hint" style="margin-top:10px; text-align:center">Apple не даёт мини-приложениям прямой доступ к HealthKit, поэтому число переносится вручную</div>`);
 };
 
 /* ---- тренировки ---- */
@@ -1947,9 +1933,9 @@ function renderFoodTab(){
       <button class="btn-primary rise" data-act="openAddFood">Добавить еду</button>
       <div class="section-title">Съедено сегодня:</div>
       ${items.length? items.map((it,i)=>`
-        <div class="log-item rise" style="animation-delay:${Math.min(i*0.04,0.3)}s">
+        <div class="log-item rise" style="animation-delay:${Math.min(i*0.04,0.3)}s" data-act="editLogItem" data-arg="${i}">
           <div class="log-emoji">${it.emoji||'🍽'}</div>
-          <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
+          <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}</div><div class="log-meta">${it.time||''}${it.grams?` · ${it.grams} г`:''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
           <div class="log-kcal">${Math.round(it.kcal)}</div>
           <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
         </div>`).join('')
@@ -1961,6 +1947,28 @@ ACTIONS.delFood = (arg)=>{
   const ds = todayStr();
   (S.foodLog[ds]||[]).splice(parseInt(arg),1);
   save(); renderTab();
+};
+ACTIONS.editLogItem = (arg)=>{
+  const i = parseInt(arg), ds = todayStr();
+  const it = (S.foodLog[ds]||[])[i]; if(!it) return;
+  openModal(`
+    <div class="modal-title">${escapeHtml(it.name)}</div>
+    <div class="modal-text">Измени граммовку — калории и БЖУ пересчитаются пропорционально${it.grams?'':' (текущая порция принята за 100 г)'}</div>
+    <input class="plain-input" id="editGramsInput" type="number" inputmode="decimal" value="${it.grams||100}" style="margin-top:12px">
+    <button class="btn-primary" style="margin-top:14px" data-act="saveLogGrams" data-arg="${i}">Сохранить</button>`);
+};
+ACTIONS.saveLogGrams = (arg)=>{
+  const i = parseInt(arg), ds = todayStr();
+  const it = (S.foodLog[ds]||[])[i]; if(!it) return;
+  const v = parseFloat(String(document.getElementById('editGramsInput').value).replace(',','.'));
+  if(!(v>0 && v<10000)){ showToast('Введи граммы'); return; }
+  const m = v/(it.grams||100);
+  it.kcal = Math.round((it.kcal||0)*m); it.p = r1((it.p||0)*m); it.c = r1((it.c||0)*m); it.f = r1((it.f||0)*m);
+  if(it.na!=null) it.na = Math.round(it.na*m);
+  if(it.k!=null) it.k = Math.round(it.k*m);
+  it.grams = Math.round(v);
+  save(true); closeModal(); renderTab(); haptic('ok');
+  showToast(`${it.name}: ${it.grams} г · ${it.kcal} ккал`);
 };
 
 /* ================= Ранжирование как в рекомендациях ================= */
@@ -2051,7 +2059,7 @@ function renderFoodTabBody(){
         <div class="switch ${cfPublic?'on':''}" id="cfPubSwitch"><div class="knob"></div></div>
       </div>
       <button class="btn-primary" style="margin-top:12px" data-act="saveCustomFood">Сохранить блюдо</button>
-      <div class="section-title" style="margin-top:18px">Своё блюдо — твоя база</div>
+      <div class="section-title" style="margin-top:18px">Добавленные тобой</div>
       ${S.customFoods.length
         ? S.customFoods.map((f,i)=>`<div style="position:relative">${foodResultHtml(f)}<button class="log-del" style="position:absolute;right:46px;top:50%;transform:translateY(-50%)" data-act="delCustomFood" data-arg="${i}">×</button></div>`).join('')
         : '<div class="empty-hint">Сохранённых блюд пока нет</div>'}`;
@@ -2188,7 +2196,7 @@ function addPickedToLog(grams){
   let item;
   if(f.per100 && grams){
     const m = grams/100, per = f.per100;
-    item = { name:f.name, emoji:f.emoji||'🍽', time:nowTime(),
+    item = { name:f.name, emoji:f.emoji||'🍽', time:nowTime(), grams:Math.round(grams),
       kcal:Math.round(per.kcal*m), p:r1(per.p*m), c:r1(per.c*m), f:r1(per.f*m),
       na: per.na!=null? Math.round(per.na*m) : null, k: per.k!=null? Math.round(per.k*m) : null };
   } else {
@@ -2275,7 +2283,7 @@ async function startScanner(){
         if(hits>=3){ stopScanner(); handleBarcode(code); }
       });
     });
-  }catch(e){ if(status) status.textContent = 'Нет доступа �� камере — введи ��од вручную'; }
+  }catch(e){ if(status) status.textContent = 'Нет доступа к камере — введи код вручную'; }
 }
 ACTIONS.manualBarcode = ()=>{
   const code = document.getElementById('manualCode').value.trim();
@@ -2448,16 +2456,19 @@ function renderSettingsTab(){
         <div class="field-row"><div class="field-row-lbl">Возраст</div><input class="field-row-input" id="sAge" type="number" inputmode="numeric" value="${p.age}"></div>
         <div class="field-row"><div class="field-row-lbl">Рост, см</div><input class="field-row-input" id="sHeight" type="number" inputmode="numeric" value="${p.height}"></div>
         <div class="field-row"><div class="field-row-lbl">Вес, кг</div><input class="field-row-input" id="sWeight" type="number" inputmode="decimal" value="${p.weight}"></div>
-        <div class="field-row"><div class="field-row-lbl">Активность</div>
-          <div class="pill-row" style="margin:0">
-            ${[['low','Слабая'],['medium','Средняя'],['high','Высокая']].map(([k,l])=>`<button class="pill ${p.activity===k?'active':''}" data-act="setActivity" data-arg="${k}">${l}</button>`).join('')}
-          </div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <button class="info-dot" data-act="infoActivity">${ic('info')}</button>
+        <div class="field-label">Уровень активности</div>
+        <div class="pill-row" style="margin-top:10px">
+          ${[['min','Минимальный'],['low','Слабый'],['medium','Умеренный'],['high','Высокий']].map(([k,l])=>`<button class="pill ${p.activity===k?'active':''}" data-act="setActivity" data-arg="${k}">${l}</button>`).join('')}
+        </div>
       </div>
       <div class="settings-hint">Дневная норма калорий автоматически пересчитывается при любом изменении</div>`;
   }
   else if(ui.settingsTab==='goal'){
-    const t = Math.round(tdee(p)/10)*10;
-    const goals = [ ['maintain','Поддерживать вес',t], ['slow','Медленно худеть',t-200], ['moderate','Худеть умеренно',t-500], ['fast','Худеть быстро',t-700] ];
+    const rk = x=>Math.round(tdee(p)*x/10)*10;
+    const goals = [ ['maintain','Поддерживать вес',rk(1)], ['slow','Худеть медленно',rk(0.90)], ['moderate','Худеть умеренно',rk(0.80)], ['fast','Худеть быстро',rk(0.72)] ];
     body = `
       <div class="goal-banner"><div class="goal-banner-num">${goalCalories(p)}</div><div class="goal-banner-lbl">ккал — твоя дневная норма</div></div>
       <div class="goal-list">
@@ -2519,6 +2530,15 @@ TABS.settings = { html: renderSettingsTab, bind: bindSettings };
 ACTIONS.settingsTab = (arg)=>{ ui.settingsTab = arg; renderTab(); };
 ACTIONS.setGender = (arg)=>{ S.profile.gender = arg; save(); renderTab(); };
 ACTIONS.setActivity = (arg)=>{ S.profile.activity = arg; save(); renderTab(); };
+ACTIONS.infoActivity = ()=> openModal(`
+  <div class="modal-title">Уровни активности</div>
+  <div class="modal-text" style="text-align:left">
+    <b>Минимальный</b> — сидячая работа, минимум шагов, тренировок нет (×1.2)<br><br>
+    <b>Слабый</b> — лёгкая активность: прогулки, 1–3 тренировки в неделю (×1.375)<br><br>
+    <b>Умеренный</b> — тренировки 3–5 раз в неделю, много движения днём (×1.55)<br><br>
+    <b>Высокий</b> — интенсивные тренировки 6–7 раз в неделю или физическая работа (×1.725)<br><br>
+    Коэффициент умножается на базовый обмен по формуле Миффлина-Сан Жеора — так считается твоя дневная норма. Норма пересчитывается сразу после выбора. Выбирай честно: завышенный уровень замедлит сушку</div>
+  <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
 ACTIONS.setGoal = (arg)=>{ S.profile.goal = arg; save(); renderTab(); };
 ACTIONS.toggleDark = ()=>{ S.theme.dark = !isDark(); save(); applyTheme(); renderTab(); };
 ACTIONS.setAccent = (arg)=>{ S.theme.accent = arg; save(); applyTheme(); renderTab(); };
