@@ -161,6 +161,18 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .goal-card.active .goal-radio::after{ content:''; position:absolute; inset:3px; border-radius:50%; background:var(--accent); }
 .goal-name{ font-size:15.5px; font-weight:600; }
 .goal-kcal{ font-size:14px; font-weight:700; color:var(--text-secondary); }
+.goal-card.hot{ position:relative;
+  background:linear-gradient(115deg,var(--accent-1) 0%,var(--accent-2) 36%,#ffffff 50%,var(--accent-2) 64%,var(--accent-1) 100%);
+  background-size:280% 280%; animation:shimmer 16s ease-in-out infinite;
+  box-shadow:0 10px 26px -8px rgba(255,140,20,.5); }
+.goal-card.hot .goal-name{ color:var(--on-accent); font-weight:700; }
+.goal-card.hot .goal-kcal{ color:var(--on-accent); opacity:.9; }
+.goal-card.hot .goal-radio{ border-color:var(--on-accent); opacity:.85; }
+.goal-card.hot.active{ border-color:var(--text); }
+.goal-card.hot.active .goal-radio{ border-color:var(--on-accent); opacity:1; }
+.goal-card.hot.active .goal-radio::after{ background:var(--on-accent); }
+.goal-info{ position:absolute; top:-9px; right:-6px; z-index:2; width:22px; height:22px; border-radius:50%; border:2px solid var(--bg); padding:0; background:var(--accent); color:var(--on-accent); font-size:12.5px; font-weight:800; font-style:italic; font-family:Georgia,'Times New Roman',serif; display:flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; box-shadow:0 3px 10px -2px rgba(0,0,0,.3); }
+.goal-info:active{ transform:scale(.9); }
 
 .btn-primary{
   width:100%; border:none; border-radius:18px; padding:18px; font-size:17px; font-weight:700;
@@ -404,7 +416,8 @@ html.lg .modal{ background:var(--glass-bg); backdrop-filter:blur(30px) saturate(
 .food-tabs::-webkit-scrollbar{ display:none; }
 .food-tab{ border:none; background:var(--card); padding:9px 15px; border-radius:14px; font-size:13.5px; font-weight:700; color:var(--text-secondary); white-space:nowrap; cursor:pointer; }
 .food-tab.active{ background:var(--accent); color:var(--on-accent); }
-.food-result{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:none; background:var(--card); box-shadow:var(--shadow); padding:12px 14px; margin-bottom:8px; border-radius:16px; cursor:pointer; color:var(--text); }
+.food-result{ position:relative; display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:none; background:var(--card); box-shadow:var(--shadow); padding:12px 14px; margin-bottom:8px; border-radius:16px; cursor:pointer; color:var(--text); }
+.pub-badge{ position:absolute; top:6px; right:9px; font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#fff; background:linear-gradient(135deg,var(--accent-1),var(--accent-2)); padding:2px 6px; border-radius:7px; pointer-events:none; }
 .food-result:active{ transform:scale(.98); }
 .food-r-emoji{ width:40px; height:40px; border-radius:12px; background:var(--card-2); display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
 .food-r-info{ flex:1; min-width:0; }
@@ -917,6 +930,43 @@ async function lookupBarcodeOFF(code){
   return offToFood(data.product);
 }
 
+/* ================= Публичная база продуктов (общая для всех пользователей) =================
+   Настройка (5 минут): создай бесплатный проект на supabase.com,
+   в SQL Editor выполни скрипт создания таблицы public_foods (см. инструкцию),
+   затем вставь сюда Project URL и anon public key из Settings → API. */
+const PUBLIC_DB = {
+  url: '', // например: 'https://abcd1234.supabase.co'
+  key: ''  // anon public key
+};
+let PUBLIC_FOODS = [];
+function publicDbReady(){ return !!(PUBLIC_DB.url && PUBLIC_DB.key); }
+async function loadPublicFoods(){
+  if(!publicDbReady()) return;
+  try{
+    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?select=name,emoji,kcal,p,c,f,na,k&order=id.desc&limit=2000',
+      { headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key } });
+    if(!res.ok) return;
+    const rows = await res.json();
+    PUBLIC_FOODS = (rows||[]).map(r=>({ name:String(r.name||'').slice(0,80), emoji:r.emoji||'🍽',
+      per100:{ kcal:Math.round(r.kcal||0), p:r1(r.p||0), c:r1(r.c||0), f:r1(r.f||0),
+        na: r.na!=null? Math.round(r.na): null, k: r.k!=null? Math.round(r.k): null }, pub:true }))
+      .filter(x=>x.name && x.per100.kcal>=0);
+  }catch(e){ /* нет сети — работаем с локальной базой */ }
+}
+async function publishFood(food){
+  if(!publicDbReady()) return false;
+  try{
+    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods',
+      { method:'POST',
+        headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body: JSON.stringify({ name:food.name, emoji:food.emoji||'🍽', kcal:food.per100.kcal,
+          p:food.per100.p||0, c:food.per100.c||0, f:food.per100.f||0, na:food.per100.na, k:food.per100.k }) });
+    if(!res.ok) return false;
+    PUBLIC_FOODS.unshift(Object.assign({}, food, {pub:true}));
+    return true;
+  }catch(e){ return false; }
+}
+
 /* ================= Калории и расчёты ================= */
 function bmr(p){ const base = 10*p.weight + 6.25*p.height - 5*p.age; return p.gender==='male' ? base+5 : base-161; }
 const ACTIVITY_MULT = { low:1.2, medium:1.375, high:1.55 };
@@ -1102,6 +1152,7 @@ async function init(){
   if(params.get('accent')) S.theme.accent = params.get('accent'); // служебное: предпросмотр акцента
   applyTheme();
   if(tg && tg.onEvent) tg.onEvent('themeChanged', applyTheme);
+  loadPublicFoods(); // подтягиваем общую базу продуктов в фоне, не блокируя старт
   app.classList.add('appear');
   if(!S.profile){ renderOnboarding(0); }
   else{
@@ -1175,15 +1226,15 @@ function renderOnboarding(step){
     const t = Math.round(tdee(draftP)/10)*10;
     const goals = [
       {k:'maintain', t:'Поддерживать вес', kcal:t},
-      {k:'slow', t:'Медленно худеть', kcal:t-200},
-      {k:'moderate', t:'Худеть умеренно ★', kcal:t-500},
+      {k:'slow', t:'Худеть медленно', kcal:t-200},
+      {k:'moderate', t:'Худеть умеренно', kcal:t-500, hot:true},
       {k:'fast', t:'Худеть быстро', kcal:t-700},
     ];
     body = `
       <div class="ob-title">Какая твоя цель?</div>
       <div class="ob-sub">Приложение само посчитает нужную калорийность</div>
       <div class="ob-body"><div class="goal-list">
-        ${goals.map(g=>`<div class="goal-card pressable ${obDraft.goal===g.k?'active':''}" data-goal="${g.k}"><div class="goal-left"><div class="goal-radio"></div><div class="goal-name">${g.t}</div></div><div class="goal-kcal">${Math.round(g.kcal)}</div></div>`).join('')}
+        ${goals.map(g=>`<div class="goal-card pressable${g.hot?' hot':''} ${obDraft.goal===g.k?'active':''}" data-goal="${g.k}">${g.hot?'<button class="goal-info" id="goalInfoBtn" aria-label="Почему это лучший выбор">i</button>':''}<div class="goal-left"><div class="goal-radio"></div><div class="goal-name">${g.t}</div></div><div class="goal-kcal">${Math.round(g.kcal)}</div></div>`).join('')}
       </div></div>`;
     canNext = !!obDraft.goal;
   }
@@ -1242,7 +1293,13 @@ function renderOnboarding(step){
   if(step===2){ const inp = document.getElementById('heightInput'); inp.oninput = ()=>{ obDraft.height = parseInt(inp.value)||null; document.getElementById('obNext').disabled = !(obDraft.height>=100 && obDraft.height<=250); }; }
   if(step===3){ const inp = document.getElementById('weightInput'); inp.oninput = ()=>{ obDraft.weight = parseFloat(String(inp.value).replace(',','.'))||null; document.getElementById('obNext').disabled = !(obDraft.weight>=30 && obDraft.weight<=300); }; }
   if(step===4) app.querySelectorAll('.activity-card').forEach(el=>{ el.onclick = ()=>{ obDraft.activity = el.dataset.a; renderOnboarding(4); }; });
-  if(step===5) app.querySelectorAll('.goal-card').forEach(el=>{ el.onclick = ()=>{ obDraft.goal = el.dataset.goal; renderOnboarding(5); }; });
+  if(step===5){
+    app.querySelectorAll('.goal-card').forEach(el=>{ el.onclick = ()=>{ obDraft.goal = el.dataset.goal; renderOnboarding(5); }; });
+    const gi = document.getElementById('goalInfoBtn');
+    if(gi) gi.onclick = (e)=>{ e.stopPropagation(); haptic('light'); openModal(`
+      <div class="modal-title">Худеть умеренно</div>
+      <div class="modal-text">Самый лучший выбор. Умеренный дефицит позволит сбросить вес за адекватный срок и свести риск срывов к минимуму, не навредив здоровью</div>`); };
+  }
   if(step===6){ const inp = document.getElementById('nameInput'); inp.oninput = ()=>{ obDraft.name = inp.value; document.getElementById('obNext').disabled = !(inp.value.trim().length>0); }; }
 
   document.getElementById('obNext').onclick = ()=>{
@@ -1442,7 +1499,7 @@ function getSmartAdvice(){
     return `К вечеру выпито только ${(water/1000).toFixed(1)} л из ${(norm/1000).toFixed(1)} л. Равномерно добери норму, но не заливай всё перед сном`;
   const steps3 = lastDays(3).reduce((s,x)=>s+daySteps(x),0)/3;
   if(steps3 < 4000)
-    return `Шагов в последние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
+    return `Шаго�� в последние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
   const si = streakInfo();
   return `Ты на верном пути${si.display>1?` — уже ${si.display}-й день подряд`:''}. Держи белок около ${targetProtein} г, соль до ${SALT_LIMIT} г и не пропускай шаги`;
 }
@@ -1901,6 +1958,7 @@ function foodResultHtml(f, src){
   const enc = encodeURIComponent(JSON.stringify(f));
   const per = f.per100 ? `${f.per100.kcal} ккал · Б ${f.per100.p} · У ${f.per100.c} · Ж ${f.per100.f} (на 100 г)` : (f.fixed? `${f.fixed.kcal} ккал порция` : '');
   return `<button class="food-result" data-act="pickFood" data-arg="${enc}">
+    ${f.pub?'<span class="pub-badge">общий</span>':''}
     <div class="log-emoji">${f.emoji||'🍽'}</div>
     <div class="food-r-info"><div class="food-r-name">${escapeHtml(f.name)}</div><div class="food-r-meta">${per}${src?` · ${src}`:''}</div></div>
     <div class="food-r-add">+</div>
@@ -1959,6 +2017,10 @@ function renderFoodTabBody(){
         <input class="plain-input" id="cfNa" type="number" inputmode="decimal" placeholder="Натрий, мг — необяз.">
         <input class="plain-input" id="cfK" type="number" inputmode="decimal" placeholder="Калий, мг — необяз.">
       </div>
+      <div class="theme-toggle-row" style="padding:12px 2px 2px" data-act="toggleCfPub">
+        <div style="font-size:14.5px;font-weight:600">Публичный продукт<div class="settings-hint" style="margin:2px 0 0">Появится в поиске у всех пользователей</div></div>
+        <div class="switch ${cfPublic?'on':''}" id="cfPubSwitch"><div class="knob"></div></div>
+      </div>
       <button class="btn-primary" style="margin-top:12px" data-act="saveCustomFood">Сохранить блюдо</button>
       <div class="section-title" style="margin-top:18px">Своё блюдо — твоя база</div>
       ${S.customFoods.length
@@ -1980,7 +2042,9 @@ function doFoodSearch(q){
   const box = document.getElementById('searchResults');
   if(!box) return;
   q = (q||'').trim().toLowerCase();
-  const local = FOOD_DB.concat(S.customFoods).filter(f=>foodMatchesQuery(f, q));
+  const mine = FOOD_DB.concat(S.customFoods);
+  const seen = new Set(mine.map(f=>f.name.toLowerCase()));
+  const local = mine.concat(PUBLIC_FOODS.filter(f=>!seen.has(f.name.toLowerCase()))).filter(f=>foodMatchesQuery(f, q));
   const ranked = rankFoods(local).slice(0, q? 30 : 15);
   /* Всегда показываем локальную базу */
   box.innerHTML = (ranked.length
@@ -2015,6 +2079,13 @@ function autoCalcKcal(){
     if(kEl && !kEl._manualEdit) kEl.value = calc;
   }
 }
+let cfPublic = false;
+ACTIONS.toggleCfPub = ()=>{
+  cfPublic = !cfPublic;
+  const sw = document.getElementById('cfPubSwitch');
+  if(sw) sw.classList.toggle('on', cfPublic);
+  haptic('ok');
+};
 function bindCustomFoodForm(){
   ['cfP','cfC','cfF'].forEach(id=>{
     const el = document.getElementById(id);
@@ -2036,8 +2107,19 @@ ACTIONS.saveCustomFood = ()=>{
   const kRaw = document.getElementById('cfK').value.trim();
   const na = naRaw==='' ? null : (parseFloat(naRaw.replace(',','.'))||0);
   const k = kRaw==='' ? null : (parseFloat(kRaw.replace(',','.'))||0);
-  S.customFoods.unshift({name, emoji:'🍽', per100:{kcal:Math.round(kcal), p, c, f, na, k}, custom:true});
-  save(true); haptic('ok'); showToast('Сохранено в «Своё блюдо»');
+  const food = {name, emoji:'🍽', per100:{kcal:Math.round(kcal), p, c, f, na, k}, custom:true, pub:cfPublic};
+  S.customFoods.unshift(food);
+  save(true); haptic('ok');
+  if(cfPublic){
+    if(publicDbReady()){
+      showToast('Сохранено! Отправляем в общую базу…');
+      publishFood(food).then(ok=> showToast(ok? 'Продукт опубликован для всех' : 'Не удалось опубликовать — продукт сохранён локально'));
+    } else {
+      showToast('Общая база не подключена — продукт сохранён локально');
+    }
+  } else {
+    showToast('Сохранено в «Своё блюдо»');
+  }
   renderFoodTabBody();
 };
 ACTIONS.delCustomFood = (arg)=>{ S.customFoods.splice(parseInt(arg),1); save(); renderFoodTabBody(); };
