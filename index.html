@@ -933,18 +933,24 @@ async function lookupBarcodeOFF(code){
 /* ================= Публичная база продуктов (общая для всех пользователей) =================
    Настройка (5 минут): создай бесплатный проект на supabase.com,
    в SQL Editor выполни скрипт создания таблицы public_foods (см. инструкцию),
-   затем вставь сюда Project URL и anon public key из Settings → API. */
+   затем вставь сюда Project URL (Settings → Data API) и Publishable key (Settings → API Keys). */
 const PUBLIC_DB = {
-  url: '', // например: 'https://abcd1234.supabase.co'
-  key: ''  // anon public key
+  url: 'https://clolqywsqbggnkyikjaq.supabase.co', // Project URL, например: 'https://abcd1234.supabase.co'
+  key: 'sb_publishable_7ic49ll_DahxwmiylKeLEw_t8RaRur4'  // Publishable key (sb_publishable_...) или старый anon key — оба подходят. Секретный (sb_secret_) сюда вставлять НЕЛЬЗЯ
 };
 let PUBLIC_FOODS = [];
 function publicDbReady(){ return !!(PUBLIC_DB.url && PUBLIC_DB.key); }
+function publicDbHeaders(extra){
+  const h = Object.assign({ apikey: PUBLIC_DB.key }, extra||{});
+  /* новые sb_-ключи передаются только в apikey; Bearer — только для старых JWT-ключей */
+  if(!/^sb_/.test(PUBLIC_DB.key)) h.Authorization = 'Bearer '+PUBLIC_DB.key;
+  return h;
+}
 async function loadPublicFoods(){
   if(!publicDbReady()) return;
   try{
     const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?select=name,emoji,kcal,p,c,f,na,k&order=id.desc&limit=2000',
-      { headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key } });
+      { headers: publicDbHeaders() });
     if(!res.ok) return;
     const rows = await res.json();
     PUBLIC_FOODS = (rows||[]).map(r=>({ name:String(r.name||'').slice(0,80), emoji:r.emoji||'🍽',
@@ -958,7 +964,7 @@ async function publishFood(food){
   try{
     const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods',
       { method:'POST',
-        headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        headers: publicDbHeaders({ 'Content-Type':'application/json', Prefer:'return=minimal' }),
         body: JSON.stringify({ name:food.name, emoji:food.emoji||'🍽', kcal:food.per100.kcal,
           p:food.per100.p||0, c:food.per100.c||0, f:food.per100.f||0, na:food.per100.na, k:food.per100.k }) });
     if(!res.ok) return false;
