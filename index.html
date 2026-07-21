@@ -269,6 +269,8 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .glass-plus{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:rgba(255,255,255,.7); transition:opacity .35s ease; }
 .glass.full .glass-plus{ opacity:0; }
 .glass:active{ transform:scale(.92); transition:transform .15s ease; }
+@keyframes glassPop{ from{ transform:scale(.4); opacity:0; } }
+.glass{ animation:glassPop .35s var(--spring) backwards; }
 .nk-grid{ display:flex; gap:10px; margin-top:14px; }
 .nk-cell{ flex:1; background:rgba(255,255,255,.07); border-radius:14px; padding:12px; }
 .nk-cell-lbl{ font-size:11px; font-weight:700; color:rgba(255,255,255,.55); }
@@ -1512,7 +1514,7 @@ function edemaHtml(){
     <div class="metric-card rise" style="animation-delay:.06s">
       <button class="info-dot" data-act="infoWater">${ic('info')}</button>
       <div class="metric-lbl">Выпито воды:</div>
-      <div class="metric-big" id="waterBig"><span class="val">${wLitre} л</span><span class="limit2"> / ${nLitre} л</span></div>
+      <div class="metric-big${water>=WATER_MAX?' over':''}" id="waterBig"><span class="val">${wLitre} л</span><span class="limit2"> / ${nLitre} л</span></div>
       <div class="water-glasses" id="waterGlasses">${waterGlassesHtml(water, norm)}</div>
     </div>
 
@@ -1523,13 +1525,20 @@ function edemaHtml(){
       <div class="action-chevron" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:32px;font-weight:600;color:rgba(255,255,255,.65)">›</div>
     </div>`;
 }
+const WATER_MAX = 10000; // максимум 10 литров
+function glassHtml(i, fill){
+  const f = Math.max(0, Math.min(1, fill));
+  return `<button class="glass ${f>=1?'full':''}" data-act="toggleGlass" data-arg="${i}" aria-label="стакан 250 мл"><i class="glass-fill" style="height:${Math.round(f*100)}%"></i><span class="glass-plus">+</span></button>`;
+}
+function waterGlassCount(water, norm){
+  const base = Math.max(1, Math.ceil(norm/250));
+  const grown = Math.floor(Math.min(water, WATER_MAX)/250) + 1; // заполнил последний — появляется новый
+  return Math.min(Math.max(base, grown), WATER_MAX/250); // но не больше 40 стаканов (10 л)
+}
 function waterGlassesHtml(water, norm){
-  const count = Math.max(1, Math.ceil(norm/250));
+  const count = waterGlassCount(water, norm);
   let out = '';
-  for(let i=0;i<count;i++){
-    const fill = Math.max(0, Math.min(1, (water - i*250)/250));
-    out += `<button class="glass ${fill>=1?'full':''}" data-act="toggleGlass" data-arg="${i}" aria-label="стакан 250 мл"><i class="glass-fill" style="height:${Math.round(fill*100)}%"></i><span class="glass-plus">+</span></button>`;
-  }
+  for(let i=0;i<count;i++) out += glassHtml(i, (water - i*250)/250);
   return out;
 }
 function updateWaterCard(){
@@ -1539,10 +1548,16 @@ function updateWaterCard(){
   if(big){
     const wL = (water/1000).toFixed(water%1000===0?0:1);
     const nL = (norm/1000).toFixed(norm%1000===0?0:1);
+    big.classList.toggle('over', water >= WATER_MAX);
     big.innerHTML = `<span class="val">${wL} л</span><span class="limit2"> / ${nL} л</span>`;
   }
   const wrap = document.getElementById('waterGlasses');
-  if(wrap) wrap.querySelectorAll('.glass').forEach((g,i)=>{
+  if(!wrap) return;
+  const count = waterGlassCount(water, norm);
+  let glasses = wrap.querySelectorAll('.glass');
+  for(let i=glasses.length-1; i>=count; i--) glasses[i].remove(); // лишние пустые убираем
+  for(let i=glasses.length; i<count; i++) wrap.insertAdjacentHTML('beforeend', glassHtml(i, (water - i*250)/250)); // новые появляются с анимацией
+  wrap.querySelectorAll('.glass').forEach((g,i)=>{
     const fill = Math.max(0, Math.min(1, (water - i*250)/250));
     g.classList.toggle('full', fill>=1);
     g.querySelector('.glass-fill').style.height = Math.round(fill*100)+'%';
@@ -1554,7 +1569,9 @@ ACTIONS.toggleGlass = (arg)=>{
   const i = parseInt(arg)||0;
   const water = S.waterLog[ds]||0;
   const full = water >= (i+1)*250;
-  S.waterLog[ds] = Math.max(0, water + (full ? -250 : 250));
+  // тап по пустому стакану заполняет все до него включительно, по полному — убирает один стакан
+  const next = full ? water - 250 : (i+1)*250;
+  S.waterLog[ds] = Math.max(0, Math.min(WATER_MAX, next));
   save(); haptic('ok');
   updateWaterCard();
 };
