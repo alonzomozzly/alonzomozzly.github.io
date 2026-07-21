@@ -269,9 +269,6 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .glass-plus{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:rgba(255,255,255,.7); transition:opacity .35s ease; }
 .glass.full .glass-plus{ opacity:0; }
 .glass:active{ transform:scale(.92); transition:transform .15s ease; }
-.water-btns{ display:flex; gap:8px; margin-top:14px; }
-.water-btn{ flex:1; border:none; border-radius:12px; padding:10px 6px; background:rgba(255,255,255,.12); color:#fff; font-size:13px; font-weight:700; cursor:pointer; }
-.water-btn.minus{ flex:.7; background:rgba(255,255,255,.06); color:rgba(255,255,255,.6); }
 .nk-grid{ display:flex; gap:10px; margin-top:14px; }
 .nk-cell{ flex:1; background:rgba(255,255,255,.07); border-radius:14px; padding:12px; }
 .nk-cell-lbl{ font-size:11px; font-weight:700; color:rgba(255,255,255,.55); }
@@ -1517,12 +1514,6 @@ function edemaHtml(){
       <div class="metric-lbl">Выпито воды:</div>
       <div class="metric-big" id="waterBig"><span class="val">${wLitre} л</span><span class="limit2"> / ${nLitre} л</span></div>
       <div class="water-glasses" id="waterGlasses">${waterGlassesHtml(water, norm)}</div>
-      <div class="water-btns">
-        <button class="water-btn" data-act="addWater" data-arg="200">+200</button>
-        <button class="water-btn" data-act="addWater" data-arg="300">+300</button>
-        <button class="water-btn" data-act="addWater" data-arg="500">+500</button>
-        <button class="water-btn minus" data-act="addWater" data-arg="-200">−200</button>
-      </div>
     </div>
 
     <div class="metric-card rise clickable" style="animation-delay:.12s" data-act="edemaToActivity">
@@ -1537,7 +1528,7 @@ function waterGlassesHtml(water, norm){
   let out = '';
   for(let i=0;i<count;i++){
     const fill = Math.max(0, Math.min(1, (water - i*250)/250));
-    out += `<button class="glass ${fill>=1?'full':''}" data-act="fillGlass" aria-label="+250 мл"><i class="glass-fill" style="height:${Math.round(fill*100)}%"></i><span class="glass-plus">+</span></button>`;
+    out += `<button class="glass ${fill>=1?'full':''}" data-act="toggleGlass" data-arg="${i}" aria-label="стакан 250 мл"><i class="glass-fill" style="height:${Math.round(fill*100)}%"></i><span class="glass-plus">+</span></button>`;
   }
   return out;
 }
@@ -1558,16 +1549,13 @@ function updateWaterCard(){
   });
 }
 ACTIONS.openEdema = ()=> openSheet(edemaHtml());
-ACTIONS.fillGlass = ()=>{
+ACTIONS.toggleGlass = (arg)=>{
   const ds = todayStr();
-  S.waterLog[ds] = (S.waterLog[ds]||0) + 250;
+  const i = parseInt(arg)||0;
+  const water = S.waterLog[ds]||0;
+  const full = water >= (i+1)*250;
+  S.waterLog[ds] = Math.max(0, water + (full ? -250 : 250));
   save(); haptic('ok');
-  updateWaterCard();
-};
-ACTIONS.addWater = (arg)=>{
-  const ds = todayStr();
-  S.waterLog[ds] = Math.max(0, (S.waterLog[ds]||0) + parseInt(arg));
-  save();
   updateWaterCard();
 };
 ACTIONS.edemaToActivity = ()=>{ closeSheet(); ui.tab='activity'; renderTab(); };
@@ -1736,7 +1724,7 @@ ACTIONS.formStrength = ()=>{
   };
   hard.oninput = ()=>{
     wDraft.hard = parseInt(hard.value);
-    document.getElementById('hardLbl').textContent = wDraft.hard<34?'Легко':(wDraft.hard<67?'Средне':'Тяжело');
+    document.getElementById('hardLbl').textContent = wDraft.hard<34?'Ле��ко':(wDraft.hard<67?'Средне':'Тяжело');
     reveal('stMuscles');
     updStrengthPreview();
   };
