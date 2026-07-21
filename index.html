@@ -465,6 +465,9 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 .import-row input{ border:none; background:var(--card); border-radius:10px; padding:10px; font-size:13px; color:var(--text); outline:none; min-width:0; }
 .import-row2{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:6px; margin-bottom:10px; }
 .import-row2 input{ border:none; background:var(--card-2); border-radius:10px; padding:9px; font-size:12.5px; color:var(--text); outline:none; min-width:0; }
+/* текст и плейсхолдеры инпутов всегда по теме (белый в тёмной, тёмный в светлой) */
+.plain-input, .import-row input, .import-row2 input{ -webkit-text-fill-color:var(--text); }
+.plain-input::placeholder, .import-row input::placeholder, .import-row2 input::placeholder{ color:var(--text-secondary); -webkit-text-fill-color:var(--text-secondary); opacity:1; }
 .import-day{ border-bottom:1px dashed var(--divider); padding-bottom:4px; margin-bottom:4px; }
 
 /* ---------- Цель достигнута ---------- */
@@ -2399,7 +2402,7 @@ ACTIONS.buildImportRows = ()=>{
         <div class="import-day-title">${fmtDateShort(ds)}${i===1?' · вчера':''}</div>
         <div class="import-row2">
           <input class="plain-input imp-kcal" type="number" inputmode="numeric" placeholder="ккал*">
-          <input class="plain-input imp-w" type="number" inputmode="decimal" placeholder="вес">
+          <input class="plain-input imp-w" type="text" inputmode="decimal" placeholder="вес">
           <input class="plain-input imp-p" type="number" inputmode="numeric" placeholder="Б">
           <input class="plain-input imp-f" type="number" inputmode="numeric" placeholder="Ж">
           <input class="plain-input imp-c" type="number" inputmode="numeric" placeholder="У">
@@ -2415,7 +2418,7 @@ ACTIONS.applyImportRows = ()=>{
     if(!(kcal>0)) return;
     days.push({
       date: row.dataset.date, kcal:Math.round(kcal),
-      weight: parseFloat(row.querySelector('.imp-w').value)||null,
+      weight: parseFloat(String(row.querySelector('.imp-w').value).replace(',','.'))||null,
       p: parseFloat(row.querySelector('.imp-p').value)||0,
       f: parseFloat(row.querySelector('.imp-f').value)||0,
       c: parseFloat(row.querySelector('.imp-c').value)||0
