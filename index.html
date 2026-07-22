@@ -261,6 +261,9 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .log-emoji{ width:38px; height:38px; border-radius:12px; background:var(--card-2); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
 .log-name{ font-size:14.5px; font-weight:600; }
 .log-meta{ font-size:12px; color:var(--text-secondary); margin-top:1px; }
+.log-grams{ font-weight:700; font-size:.92em; opacity:.95; }
+.log-kcal-wrap{ display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; flex-shrink:0; }
+.log-kcal-unit{ font-size:10.5px; color:var(--text-secondary); font-weight:700; margin-top:1px; }
 .log-kcal{ margin-left:auto; font-size:14.5px; font-weight:700; white-space:nowrap; }
 .log-del{ border:none; background:none; color:var(--text-tertiary); font-size:15px; padding:6px; cursor:pointer; }
 .empty-hint{ text-align:center; color:var(--text-secondary); font-size:13.5px; padding:20px 10px; line-height:1.5; }
@@ -300,7 +303,7 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .nk-ratio-badge.good{ color:#7be08a; } .nk-ratio-badge.mid{ color:#ffd166; } .nk-ratio-badge.bad{ color:#ff8a80; }
 
 /* ---------- Активность ---------- */
-.act-hero{ display:flex; gap:14px; align-items:stretch; margin-top:8px; }
+.act-hero{ display:grid; grid-template-columns:1.25fr 1fr; gap:14px; align-items:stretch; margin-top:8px; }
 .steps-card{ flex:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
 .train-card{ flex:1; align-self:stretch; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
 .train-icon{ width:54px; height:54px; border-radius:18px; background:var(--chip); color:var(--chip-text); display:flex; align-items:center; justify-content:center; }
@@ -620,6 +623,7 @@ function ic(name, sw){
     plus:'<path d="M12 5v14M5 12h14"/>',
     bolt:'<path d="M13.4 2.6 5.6 13h4.5l-1.7 8 8.6-12h-4.6l1-6.4z"/>',
     walk:'<circle cx="13" cy="4.4" r="1.7"/><path d="M12.5 8.5 9 21M12.5 8.5l3 3.5 3 1M12.5 8.5 9.5 11l-1 4M9 15.5 6.5 21"/>',
+    shoe:'<path d="M2.8 18h18.4v-1.2c0-1.4-1-2.6-2.4-2.9l-4.6-1-2.8-3.2c-.4 1-1.4 1.6-2.5 1.4l-1.6-.3c-.5 1.3-1.8 2.2-3.2 2.2H2.8v5z"/><path d="M2.8 15.4h18.4"/><path d="M12 12.2l1 1.1M14.2 11.7l1 1.1"/>',
     download:'<path d="M12 3.5v10M8 9.5l4 4 4-4"/><path d="M4.5 17v3.5h15V17"/>',
     upload:'<path d="M12 13.5v-10M8 7.5l4-4 4 4"/><path d="M4.5 17v3.5h15V17"/>',
     restore:'<path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 3.5V7h3.5"/>',
@@ -637,47 +641,92 @@ function ic(name, sw){
      Каждый пользователь видит только свои данные.
    — вне Telegram (браузер): localStorage как запасной вариант.
    Значения CloudStorage ограничены 4096 символами — режем на части. */
-const CS_CHUNK = 3500, CS_MAX = 60;
+const CS_CHUNK = 3500, CS_MAX = 200;
 function csGetItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.getItems(keys,(e,v)=>res(e?null:v)); }catch(_){ res(null); } }); }
 function csSetItem(k,v){ return new Promise(res=>{ try{ tg.CloudStorage.setItem(k,v,(e,ok)=>res(!e&&ok!==false)); }catch(_){ res(false); } }); }
 function csRemoveItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.removeItems(keys,()=>res(true)); }catch(_){ res(false); } }); }
 
-async function storageLoad(){
-  if(cloudOK){
-    try{
-      const meta = await csGetItems(['cs_meta']);
-      const n = meta && meta.cs_meta ? (parseInt(meta.cs_meta)||0) : 0;
-      if(n>0 && n<=CS_MAX){
-        const keys = Array.from({length:n},(_,i)=>'cs_'+i);
+let _csGen = 'A';
+async function cloudRead(){
+  try{
+    const meta = await csGetItems(['cs2_meta','cs_meta']);
+    if(meta && meta.cs2_meta){
+      /* новый формат: генерация:число_кусков:длина — читаем только целостную копию */
+      const [gen, nStr, lenStr] = String(meta.cs2_meta).split(':');
+      const n = parseInt(nStr)||0, len = parseInt(lenStr)||0;
+      if((gen==='A'||gen==='B') && n>0 && n<=CS_MAX){
+        _csGen = gen;
+        const keys = Array.from({length:n},(_,i)=>'cs'+gen+'_'+i);
         const parts = await csGetItems(keys);
         if(parts){
           const json = keys.map(k=>parts[k]||'').join('');
-          if(json) return JSON.parse(json);
+          if(json.length===len || !len) return JSON.parse(json);
         }
       }
-    }catch(e){}
-  }
-  try{ const raw = localStorage.getItem('charge_v2'); if(raw) return JSON.parse(raw); }catch(e){}
+      return null;
+    }
+    /* старый формат — совместимость с уже сохранёнными профилями */
+    const n = meta && meta.cs_meta ? (parseInt(meta.cs_meta)||0) : 0;
+    if(n>0 && n<=60){
+      const keys = Array.from({length:n},(_,i)=>'cs_'+i);
+      const parts = await csGetItems(keys);
+      if(parts){ const json = keys.map(k=>parts[k]||'').join(''); if(json) return JSON.parse(json); }
+    }
+  }catch(e){}
   return null;
 }
-let _saveTimer = null, _savedChunks = 0;
+async function storageLoad(){
+  let local = null;
+  try{ const raw = localStorage.getItem('charge_v2'); if(raw) local = JSON.parse(raw); }catch(e){}
+  let cloud = null;
+  if(cloudOK){
+    cloud = await cloudRead();
+    if(!cloud) cloud = await cloudRead(); /* повтор на случай сетевого сбоя */
+  }
+  /* берём самую свежую из двух копий — так заполненный день не потеряется, даже если облачная запись оборвалась */
+  if(cloud && local) return ((cloud.savedAt||0) >= (local.savedAt||0)) ? cloud : local;
+  return cloud || local;
+}
+let _saveTimer = null, _csSaving = false, _csPending = false;
 function save(now){ clearTimeout(_saveTimer); _saveTimer = setTimeout(doSave, now?0:400); }
+function pruneHistory(){
+  /* если данные разрослись — держим последние 180 дней и 250 частых продуктов */
+  const cut = todayStr(new Date(Date.now()-180*86400000));
+  [S.foodLog, S.waterLog, S.stepsLog, S.workoutLog].forEach(log=>{ if(log) Object.keys(log).forEach(d=>{ if(d<cut) delete log[d]; }); });
+  const keys = Object.keys(S.foodFreq||{});
+  if(keys.length>250){
+    keys.sort((a,b)=> String(S.foodFreq[b].last||'').localeCompare(String(S.foodFreq[a].last||'')));
+    keys.slice(250).forEach(k=> delete S.foodFreq[k]);
+  }
+}
 async function doSave(){
+  S.savedAt = Date.now();
   let json = '';
   try{ json = JSON.stringify(S); }catch(e){ return; }
   try{ localStorage.setItem('charge_v2', json); }catch(e){}
   if(!cloudOK) return;
+  if(_csSaving){ _csPending = true; return; }
+  _csSaving = true;
   try{
-    const n = Math.min(CS_MAX, Math.ceil(json.length/CS_CHUNK));
-    for(let i=0;i<n;i++) await csSetItem('cs_'+i, json.slice(i*CS_CHUNK,(i+1)*CS_CHUNK));
-    await csSetItem('cs_meta', String(n));
-    if(_savedChunks>n){
-      const extra = []; for(let i=n;i<_savedChunks;i++) extra.push('cs_'+i);
-      await csRemoveItems(extra);
+    if(json.length > CS_CHUNK*CS_MAX){ pruneHistory(); S.savedAt = Date.now(); json = JSON.stringify(S); try{ localStorage.setItem('charge_v2', json); }catch(e){} }
+    /* пишем в НЕАКТИВНУЮ генерацию и переключаем мету только после успеха всех кусков — старая копия остаётся целой */
+    const gen = _csGen==='A' ? 'B' : 'A';
+    const n = Math.max(1, Math.ceil(json.length/CS_CHUNK));
+    let ok = n<=CS_MAX;
+    for(let i=0; i<n && ok; i++){
+      const chunk = json.slice(i*CS_CHUNK,(i+1)*CS_CHUNK);
+      let r = await csSetItem('cs'+gen+'_'+i, chunk);
+      if(!r) r = await csSetItem('cs'+gen+'_'+i, chunk); /* один повтор */
+      ok = ok && r;
     }
-    _savedChunks = n;
+    if(ok && await csSetItem('cs2_meta', gen+':'+n+':'+json.length)) _csGen = gen;
   }catch(e){}
+  _csSaving = false;
+  if(_csPending){ _csPending = false; save(true); }
 }
+/* сбрасываем отложенное сохранение на диск/в облако при сворачивании — иначе последние действия терялись при быстром закрытии */
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ clearTimeout(_saveTimer); doSave(); } });
+window.addEventListener('pagehide', ()=>{ clearTimeout(_saveTimer); doSave(); });
 window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') doSave(); });
 
 /* ================= Состояние ================= */
@@ -695,6 +744,8 @@ let S = {
   goalShown:false
 };
 let ui = { tab:'home', settingsTab:'profile' };
+let editDs = null; /* дата, для которой редактируется питание (null = сегодня) */
+function logDs(){ return editDs || todayStr(); }
 
 function todayStr(d){ d = d || new Date(); const off = d.getTimezoneOffset(); const l = new Date(d.getTime()-off*60000); return l.toISOString().slice(0,10); }
 function fmtDate(dstr){ const d = new Date(dstr+'T00:00:00'); return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'}); }
@@ -987,6 +1038,23 @@ function tdee(p){ return bmr(p) * (ACTIVITY_MULT[p.activity] || 1.375); }
 const GOAL_PCT = { maintain:0, slow:0.10, moderate:0.20, fast:0.28 };
 function goalRateKgWeek(p){ return Math.round(tdee(p)*(GOAL_PCT[p.goal]||0)*7/7700*20)/20; }
 function goalCalories(p){ const t = tdee(p)*(1-(GOAL_PCT[p.goal]||0)) + (p.calorieAdjust||0); return Math.round(t/10)*10; }
+/* умные нормы БЖУ: при большом лишнем весе белок/жир считаем от «расчётного» веса
+   (норма BMI 22 + четверть избытка), а не от фактического — жировая масса белок не требует.
+   Углеводы — из остатка калорий, но не меньше 10% нормы */
+function leanRefWeight(p){
+  const ideal = 22 * Math.pow(p.height/100, 2);
+  return p.weight <= ideal ? p.weight : Math.round(ideal + (p.weight-ideal)*0.25);
+}
+function macroTargets(p){
+  const kcal = goalCalories(p);
+  const ref = leanRefWeight(p);
+  const protein = Math.round(ref*1.8);
+  let fat = Math.max(Math.round(ref*0.8), 40);
+  let carbs = Math.round((kcal - protein*4 - fat*9)/4);
+  const minCarbs = Math.round(kcal*0.10/4);
+  if(carbs < minCarbs){ carbs = minCarbs; fat = Math.max(40, Math.round((kcal - protein*4 - carbs*4)/9)); }
+  return { protein, fat, carbs: Math.max(carbs, 0) };
+}
 
 function dayItems(ds){ return S.foodLog[ds] || []; }
 function dayTotal(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.kcal||0),0)); }
@@ -1091,7 +1159,7 @@ function openSheet(html){
   content._swipeEnd = onTE;
   content.addEventListener('touchend', onTE, {passive:true});
 }
-function closeSheet(){
+function closeSheet(){ editDs = null;
   if(typeof stopScanner==='function') stopScanner();
   if(typeof stopMotion==='function') {}
   const overlay = document.getElementById('sheetOverlay');
@@ -1408,9 +1476,10 @@ function renderHome(){
   const dash = circumference*(1-pct);
   const rateWeek = goalRateKgWeek(p);
   const advice = getSmartAdvice();
-  const targetProtein = Math.round(p.weight*2.0);
-  const targetFat = Math.round(p.weight*0.9);
-  const targetCarbs = Math.max(0, Math.round((goal - targetProtein*4 - targetFat*9) / 4));
+  const mt = macroTargets(p);
+  const targetProtein = mt.protein;
+  const targetFat = mt.fat;
+  const targetCarbs = mt.carbs;
   const protein = dayMacro(ds,'p');
   const missingP = targetProtein - protein;
   const hour = new Date().getHours();
@@ -1494,7 +1563,7 @@ function getSmartAdvice(){
   const p = S.profile;
   const ds = todayStr();
   const goal = goalCalories(p);
-  const targetProtein = Math.round(p.weight*1.8);
+  const targetProtein = macroTargets(p).protein;
   const days3 = lastDays(4).slice(1).filter(x=>dayItems(x).length>0);
   if(dayItems(ds).length===0 && days3.length===0)
     return `Начни с первого приёма пищи. Цель на день — ${goal} ккал и около ${targetProtein} г белка, чтобы сохранить мышцы на сушке`;
@@ -1689,8 +1758,7 @@ function renderActivityTab(){
           </div>
           <div class="steps-goal">цель ${STEPS_GOAL.toLocaleString('ru-RU')}${stepsKcal(ds)>0?' · ≈ '+stepsKcal(ds)+' ккал':''}</div>
           <div class="steps-btns">
-            <button class="mini-btn" data-act="importSteps">${ic('walk')} Health / Fitness</button>
-            <button class="mini-btn" data-act="editSteps">Ввести</button>
+            <button class="mini-btn" data-act="importSteps">${ic('shoe')} Записать шаги</button>
           </div>
         </div>
         <button class="train-card card rise" style="animation-delay:.07s" data-act="openWorkouts">
@@ -1719,13 +1787,6 @@ ACTIONS.delWorkout = (arg)=>{
   save(); renderTab();
   if(document.getElementById('sheetOverlay').classList.contains('open')) openSheet(workoutsHtml());
 };
-ACTIONS.editSteps = ()=>{
-  openModal(`
-    <div class="modal-title">Шаги за сегодня</div>
-    <div class="modal-text">Введи число шагов за сегодня — расход калорий пересчитается автоматически</div>
-    <input class="plain-input" id="stepsInput" type="number" inputmode="numeric" placeholder="${daySteps(todayStr())||8000}" style="margin-top:12px">
-    <button class="btn-primary" style="margin-top:14px" data-act="saveSteps">Сохранить</button>`);
-};
 ACTIONS.saveSteps = ()=>{
   const v = parseInt(document.getElementById('stepsInput').value);
   if(!(v>=0 && v<100000)){ showToast('Введи число шагов'); return; }
@@ -1736,10 +1797,10 @@ ACTIONS.saveSteps = ()=>{
 /* импорт шагов из Apple Health / Fitness */
 ACTIONS.importSteps = ()=>{
   openModal(`
-    <div class="modal-title">Импорт из Health / Fitness</div>
+    <div class="modal-title">Шаги за сегодня</div>
     <div class="modal-text">1. Открой «Здоровье» (Health) или «Фитнес» (Fitness) на iPhone<br>2. Посмотри число шагов за сегодня<br>3. Введи его сюда — расход калорий пересчитается автоматически</div>
     <input class="plain-input" id="stepsInput" type="number" inputmode="numeric" placeholder="${daySteps(todayStr())||8000}" style="margin-top:12px">
-    <button class="btn-primary" style="margin-top:14px" data-act="saveSteps">Импортировать</button>
+    <button class="btn-primary" style="margin-top:14px" data-act="saveSteps">Записать</button>
     <div class="settings-hint" style="margin-top:10px; text-align:center">Apple не даёт мини-приложениям прямой доступ к HealthKit, поэтому число переносится вручную</div>`);
 };
 
@@ -1935,8 +1996,8 @@ function renderFoodTab(){
       ${items.length? items.map((it,i)=>`
         <div class="log-item rise" style="animation-delay:${Math.min(i*0.04,0.3)}s" data-act="editLogItem" data-arg="${i}">
           <div class="log-emoji">${it.emoji||'🍽'}</div>
-          <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}</div><div class="log-meta">${it.time||''}${it.grams?` · ${it.grams} г`:''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
-          <div class="log-kcal">${Math.round(it.kcal)}</div>
+          <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
+          <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
           <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
         </div>`).join('')
       : '<div class="empty-hint">Пока пусто. Добавь первый приём пищи!</div>'}
@@ -1944,12 +2005,13 @@ function renderFoodTab(){
 }
 TABS.food = { html: renderFoodTab };
 ACTIONS.delFood = (arg)=>{
-  const ds = todayStr();
+  const ds = logDs();
   (S.foodLog[ds]||[]).splice(parseInt(arg),1);
-  save(); renderTab();
+  save(true); haptic('warn'); renderTab();
+  if(editDs) openSheet(dayEditorHtml(editDs));
 };
 ACTIONS.editLogItem = (arg)=>{
-  const i = parseInt(arg), ds = todayStr();
+  const i = parseInt(arg), ds = logDs();
   const it = (S.foodLog[ds]||[])[i]; if(!it) return;
   openModal(`
     <div class="modal-title">${escapeHtml(it.name)}</div>
@@ -1958,7 +2020,7 @@ ACTIONS.editLogItem = (arg)=>{
     <button class="btn-primary" style="margin-top:14px" data-act="saveLogGrams" data-arg="${i}">Сохранить</button>`);
 };
 ACTIONS.saveLogGrams = (arg)=>{
-  const i = parseInt(arg), ds = todayStr();
+  const i = parseInt(arg), ds = logDs();
   const it = (S.foodLog[ds]||[])[i]; if(!it) return;
   const v = parseFloat(String(document.getElementById('editGramsInput').value).replace(',','.'));
   if(!(v>0 && v<10000)){ showToast('Введи граммы'); return; }
@@ -1968,6 +2030,7 @@ ACTIONS.saveLogGrams = (arg)=>{
   if(it.k!=null) it.k = Math.round(it.k*m);
   it.grams = Math.round(v);
   save(true); closeModal(); renderTab(); haptic('ok');
+  if(editDs) openSheet(dayEditorHtml(editDs));
   showToast(`${it.name}: ${it.grams} г · ${it.kcal} ккал`);
 };
 
@@ -2008,7 +2071,8 @@ function addFoodHtml(){
     <div class="food-tabs">${tabs.map(t=>`<button class="food-tab ${foodTab===t.k?'active':''}" data-act="foodTab" data-arg="${t.k}">${t.l}</button>`).join('')}</div>
     <div id="foodTabBody"></div>`;
 }
-ACTIONS.openAddFood = ()=>{ foodTab = 'search'; openSheet(addFoodHtml()); renderFoodTabBody(); };
+ACTIONS.openAddFood = ()=>{ editDs = null; foodTab = 'search'; openSheet(addFoodHtml()); renderFoodTabBody(); };
+ACTIONS.openAddFoodForDay = ()=>{ foodTab = 'search'; openSheet(addFoodHtml()); renderFoodTabBody(); };
 ACTIONS.foodTab = (arg)=>{ stopScanner(); foodTab = arg; openSheet(addFoodHtml()); renderFoodTabBody(); };
 
 function renderFoodTabBody(){
@@ -2045,14 +2109,14 @@ function renderFoodTabBody(){
       <div class="field-label">Новое блюдо (на 100 г)</div>
       <input class="plain-input" id="cfName" type="text" placeholder="Название" style="margin-bottom:8px">
       <div class="import-row2">
-        <input class="plain-input" id="cfKcal" type="number" inputmode="decimal" placeholder="ккал (авто — или введи сам)">
-        <input class="plain-input" id="cfP" type="number" inputmode="decimal" placeholder="Б, г">
-        <input class="plain-input" id="cfC" type="number" inputmode="decimal" placeholder="У, г">
-        <input class="plain-input" id="cfF" type="number" inputmode="decimal" placeholder="Ж, г">
+        <input class="plain-input" id="cfKcal" type="text" inputmode="decimal" placeholder="ккал на 100 г">
+        <input class="plain-input" id="cfP" type="text" inputmode="decimal" placeholder="Б, г — можно 3.6">
+        <input class="plain-input" id="cfC" type="text" inputmode="decimal" placeholder="У, г">
+        <input class="plain-input" id="cfF" type="text" inputmode="decimal" placeholder="Ж, г">
       </div>
       <div class="import-row2" style="margin-top:8px">
-        <input class="plain-input" id="cfNa" type="number" inputmode="decimal" placeholder="Натрий, мг — необяз.">
-        <input class="plain-input" id="cfK" type="number" inputmode="decimal" placeholder="Калий, мг — необяз.">
+        <input class="plain-input" id="cfNa" type="text" inputmode="decimal" placeholder="Натрий, мг — необяз.">
+        <input class="plain-input" id="cfK" type="text" inputmode="decimal" placeholder="Калий, мг — необяз.">
       </div>
       <div class="theme-toggle-row" style="padding:12px 2px 2px" data-act="toggleCfPub">
         <div style="font-size:14.5px;font-weight:600">Публичный продукт<div class="settings-hint" style="margin:2px 0 0">Появится в поиске у всех пользователей</div></div>
@@ -2106,16 +2170,6 @@ function doFoodSearch(q){
   }
 }
 
-function autoCalcKcal(){
-  const p = parseFloat(document.getElementById('cfP')?.value)||0;
-  const c = parseFloat(document.getElementById('cfC')?.value)||0;
-  const f = parseFloat(document.getElementById('cfF')?.value)||0;
-  if(p+c+f>0){
-    const calc = Math.round(p*4 + c*4 + f*9);
-    const kEl = document.getElementById('cfKcal');
-    if(kEl && !kEl._manualEdit) kEl.value = calc;
-  }
-}
 let cfPublic = false;
 ACTIONS.toggleCfPub = ()=>{
   cfPublic = !cfPublic;
@@ -2123,28 +2177,21 @@ ACTIONS.toggleCfPub = ()=>{
   if(sw) sw.classList.toggle('on', cfPublic);
   haptic('ok');
 };
-function bindCustomFoodForm(){
-  ['cfP','cfC','cfF'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.oninput = autoCalcKcal;
-  });
-  const kEl = document.getElementById('cfKcal');
-  if(kEl) kEl.oninput = ()=>{ kEl._manualEdit = kEl.value.trim()!==''; };
-}
+function bindCustomFoodForm(){ /* авторасчёта калорий больше нет — всё вводится вручную, десятые поддерживаются */ }
 ACTIONS.saveCustomFood = ()=>{
   const name = document.getElementById('cfName').value.trim();
-  autoCalcKcal();
-  const kcal = parseFloat(document.getElementById('cfKcal').value);
+  const numv = id => parseFloat(String(document.getElementById(id).value).replace(',','.'));
+  const kcal = numv('cfKcal');
   if(!name){ showToast('Введи название блюда'); return; }
-  if(!(kcal>0)){ showToast('Нужны калории — введи БЖУ или ккал вручную'); return; }
-  const p = parseFloat(document.getElementById('cfP').value)||0;
-  const c = parseFloat(document.getElementById('cfC').value)||0;
-  const f = parseFloat(document.getElementById('cfF').value)||0;
+  if(!(kcal>0)){ showToast('Введи калорийность на 100 г'); return; }
+  const p = numv('cfP')||0;
+  const c = numv('cfC')||0;
+  const f = numv('cfF')||0;
   const naRaw = document.getElementById('cfNa').value.trim();
   const kRaw = document.getElementById('cfK').value.trim();
   const na = naRaw==='' ? null : (parseFloat(naRaw.replace(',','.'))||0);
   const k = kRaw==='' ? null : (parseFloat(kRaw.replace(',','.'))||0);
-  const food = {name, emoji:'🍽', per100:{kcal:Math.round(kcal), p, c, f, na, k}, custom:true, pub:cfPublic};
+  const food = {name, emoji:'🍽', per100:{kcal:Math.round(kcal), p:r1(p), c:r1(c), f:r1(f), na, k}, custom:true, pub:cfPublic};
   S.customFoods.unshift(food);
   save(true); haptic('ok');
   if(cfPublic){
@@ -2203,7 +2250,7 @@ function addPickedToLog(grams){
     const x = f.fixed || f;
     item = { name:f.name, emoji:f.emoji||'🍽', time:nowTime(), kcal:x.kcal, p:x.p||0, c:x.c||0, f:x.f||0, na:x.na!=null?x.na:null, k:x.k!=null?x.k:null };
   }
-  const ds = todayStr();
+  const ds = logDs();
   (S.foodLog[ds] = S.foodLog[ds]||[]).push(item);
   bumpFreq(f);
   save(true); haptic('ok');
@@ -2402,7 +2449,7 @@ function renderStatsTab(){
       else cls = 'bad';
     }
     if(d===today) cls += ' today';
-    cal += `<div class="cal-cell ${cls}" title="${d}">${parseInt(d.slice(8),10)}</div>`;
+    cal += `<div class="cal-cell ${cls}" data-act="openDay" data-arg="${d}">${parseInt(d.slice(8),10)}</div>`;
   });
 
   return `
@@ -2438,6 +2485,30 @@ function renderStatsTab(){
     </div>`;
 }
 TABS.stats = { html: renderStatsTab };
+
+/* ---- редактор дня из календаря: можно вернуться и дозаполнить пропущенный день ---- */
+function dayEditorHtml(ds){
+  const items = S.foodLog[ds]||[];
+  const goal = goalCalories(S.profile);
+  const w = (S.workoutLog[ds]||[]).length;
+  return `
+    <div class="sheet-title">${fmtDate(ds)}</div>
+    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал${w?` · тренировок: ${w}`:''} · нажми на продукт, чтобы изменить граммовку</div>`
+    + (items.length ? items.map((it,i)=>`
+      <div class="log-item" data-act="editLogItem" data-arg="${i}">
+        <div class="log-emoji">${it.emoji||'🍽'}</div>
+        <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
+        <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
+        <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
+      </div>`).join('') : `<div class="empty-hint">В этот день записей нет — добавь еду</div>`)
+    + `<button class="btn-primary" style="margin-top:14px" data-act="openAddFoodForDay">Добавить еду</button>`;
+}
+ACTIONS.openDay = (arg)=>{
+  if(!arg || !S.profile) return;
+  editDs = (arg===todayStr()) ? null : arg;
+  openSheet(dayEditorHtml(arg));
+  haptic('light');
+};
 
 /* ================= Настройки ================= */
 function renderSettingsTab(){
