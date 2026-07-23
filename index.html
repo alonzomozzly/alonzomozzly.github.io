@@ -305,6 +305,7 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 /* ---------- Активность ---------- */
 .lock-screen{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; padding:40px 28px; text-align:center; gap:14px; }
 .lock-logo{ font-size:54px; margin-bottom:4px; }
+.lock-reason{ font-size:11px; color:var(--text-secondary); opacity:.55; margin-top:8px; }
 .act-hero{ display:grid; grid-template-columns:1.25fr 1fr; gap:14px; align-items:stretch; margin-top:8px; }
 .steps-card{ flex:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
 .train-card{ flex:1; align-self:stretch; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
@@ -832,7 +833,7 @@ let ui = { tab:'home', settingsTab:'profile' };
    Telegram initData и членство в канале через Bot API. Обойти через клиент нельзя.
    Пока ACCESS_FN_URL пуст — проверка выключена и приложение работает как раньше. */
 const ACCESS_FN_URL = 'https://clolqywsqbggnkyikjaq.supabase.co/functions/v1/check-access'; /* ВСТАВЬ: https://<project-ref>.supabase.co/functions/v1/check-access */
-const CHANNEL_LINK = 'https://t.me/+V3rNhsYnibI3ODYy';  /* ВСТАВЬ: ссылка-приглашение в закрытый канал, напр. https://t.me/+AbCdEf123 */
+const ACCESS_LINK = ''; /* ссылка на ПОКУПКУ доступа (бот оплаты/менеджер) — НИКОГДА не инвайт в канал! */  /* ВСТАВЬ: ссылка-приглашение в закрытый канал, напр. https://t.me/+AbCdEf123 */
 async function checkAccess(){
   if(!ACCESS_FN_URL || !tg || !tg.initData) return {access:'member'};
   try{
@@ -849,20 +850,21 @@ function renderLock(expired){
     <div class="lock-screen">
       <div class="lock-logo">⚡</div>
       <div class="ob-title">Доступ по подписке</div>
-      <div class="ob-sub">${expired==='trial_over' ? 'Пробные 3 недели закончились. ' : ''}Приложение доступно подписчикам закрытого канала — вступай и продолжай сушку. Твои данные сохранены и никуда не денутся</div>
-      <button class="btn-primary" data-act="joinChannel">Вступить в канал</button>
-      <button class="btn-secondary" data-act="recheckAccess">Я подписан — проверить</button>
+      <div class="ob-sub">${expired==='trial_over' ? 'Пробные 3 недели закончились. ' : ''}Приложение доступно подписчикам закрытого канала — оформи доступ и продолжай сушку. Твои данные сохранены и никуда не денутся</div>
+      <button class="btn-primary" data-act="joinChannel">Получить доступ</button>
+      <button class="btn-secondary" data-act="recheckAccess">Доступ есть — проверить</button>
+      ${expired?`<div class="lock-reason">код: ${escapeHtml(String(expired))}</div>`:``}
     </div>`;
 }
 ACTIONS.joinChannel = ()=>{
-  if(!CHANNEL_LINK){ showToast('Ссылка на канал не настроена'); return; }
-  if(tg && tg.openTelegramLink) tg.openTelegramLink(CHANNEL_LINK); else window.open(CHANNEL_LINK, '_blank');
+  if(!ACCESS_LINK){ showToast('Напиши в бота — подскажет, как получить доступ'); return; }
+  if(tg && tg.openTelegramLink) tg.openTelegramLink(ACCESS_LINK); else window.open(ACCESS_LINK, '_blank');
 };
 ACTIONS.recheckAccess = async ()=>{
   showToast('Проверяем…');
   const a = await checkAccess();
   if(a && a.access!=='expired') location.reload();
-  else showToast('Подписка не найдена — вступи в канал и попробуй снова');
+  else showToast('Подписка не найдена — оформи доступ и попробуй снова');
 };
 let editDs = null; /* дата, для которой редактируется питание (null = сегодня) */
 function logDs(){ return editDs || todayStr(); }
