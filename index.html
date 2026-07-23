@@ -837,7 +837,11 @@ const ACCESS_LINK = ''; /* ссылка на ПОКУПКУ доступа (бо
 async function checkAccess(){
   if(!ACCESS_FN_URL || !tg || !tg.initData) return {access:'member'};
   try{
-    const r = await fetch(ACCESS_FN_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ initData: tg.initData }) });
+    /* жёсткий лимит 6с: если сервер думает долго — открываем приложение, а не висим на сплэше */
+    const ctl = new AbortController();
+    const tid = setTimeout(()=>ctl.abort(), 6000);
+    const r = await fetch(ACCESS_FN_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ initData: tg.initData }), signal: ctl.signal });
+    clearTimeout(tid);
     const j = await r.json();
     if(j && j.access){ S.accessCache = { v:j, at:Date.now() }; save(); return j; }
   }catch(e){}
