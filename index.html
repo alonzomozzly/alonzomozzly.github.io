@@ -860,11 +860,11 @@ function renderLock(expired){
       ${expired?`<div class="lock-reason">код: ${escapeHtml(String(expired))}</div>`:``}
     </div>`;
 }
-ACTIONS.joinChannel = ()=>{
+function gateJoinChannel(){
   if(!ACCESS_LINK){ showToast('Напиши в бота — подскажет, как получить доступ'); return; }
   if(tg && tg.openTelegramLink) tg.openTelegramLink(ACCESS_LINK); else window.open(ACCESS_LINK, '_blank');
 };
-ACTIONS.recheckAccess = async ()=>{
+async function gateRecheckAccess(){
   showToast('Проверяем…');
   const a = await checkAccess();
   if(a && a.access!=='expired') location.reload();
@@ -1259,6 +1259,8 @@ function showToast(msg){
 
 /* делегирование кликов */
 const ACTIONS = {};
+ACTIONS.joinChannel = gateJoinChannel;
+ACTIONS.recheckAccess = gateRecheckAccess;
 document.addEventListener('click', (e)=>{
   const el = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
   if(!el) return;
