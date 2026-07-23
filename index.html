@@ -303,6 +303,8 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .nk-ratio-badge.good{ color:#7be08a; } .nk-ratio-badge.mid{ color:#ffd166; } .nk-ratio-badge.bad{ color:#ff8a80; }
 
 /* ---------- Активность ---------- */
+.lock-screen{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; padding:40px 28px; text-align:center; gap:14px; }
+.lock-logo{ font-size:54px; margin-bottom:4px; }
 .act-hero{ display:grid; grid-template-columns:1.25fr 1fr; gap:14px; align-items:stretch; margin-top:8px; }
 .steps-card{ flex:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
 .train-card{ flex:1; align-self:stretch; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
@@ -646,7 +648,7 @@ function csGetItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.getIte
 function csSetItem(k,v){ return new Promise(res=>{ try{ tg.CloudStorage.setItem(k,v,(e,ok)=>res(!e&&ok!==false)); }catch(_){ res(false); } }); }
 function csRemoveItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.removeItems(keys,()=>res(true)); }catch(_){ res(false); } }); }
 
-let _csGen = 'A';
+let _csGen = 'A', _cloudHadProfile = false, _lastProfileJson = '';
 async function cloudRead(){
   try{
     const meta = await csGetItems(['cs2_meta','cs_meta']);
@@ -684,8 +686,24 @@ async function storageLoad(){
     if(!cloud) cloud = await cloudRead(); /* повтор на случай сетевого сбоя */
   }
   /* берём самую свежую из двух копий — так заполненный день не потеряется, даже если облачная запись оборвалась */
-  if(cloud && local) return ((cloud.savedAt||0) >= (local.savedAt||0)) ? cloud : local;
-  return cloud || local;
+  let st = (cloud && local) ? (((cloud.savedAt||0) >= (local.savedAt||0)) ? cloud : local) : (cloud || local);
+  if(st && st.profile) _cloudHadProfile = true;
+  /* бронежилет: профиль лежит ещё и в отдельном маленьком слоте —
+     даже если основные данные побились, аккаунт не слетает в онбординг */
+  if(cloudOK && (!st || !st.profile)){
+    try{
+      const pr = await csGetItems(['cs_profile']);
+      if(pr && pr.cs_profile){
+        const prof = JSON.parse(pr.cs_profile);
+        if(prof && prof.gender && prof.height){
+          _cloudHadProfile = true;
+          st = st || {};
+          st.profile = prof;
+        }
+      }
+    }catch(e){}
+  }
+  return st;
 }
 let _saveTimer = null, _csSaving = false, _csPending = false;
 function save(now){ clearTimeout(_saveTimer); _saveTimer = setTimeout(doSave, now?0:400); }
@@ -700,11 +718,22 @@ function pruneHistory(){
   }
 }
 async function doSave(){
+  if(cloudOK && !_csSaving){
+    try{
+      const ts = await cloudPeek();
+      if(ts > (S.savedAt||0)){
+        const remote = await cloudRead();
+        if(remote) S = mergeStates(S, remote);
+      }
+    }catch(e){}
+  }
   S.savedAt = Date.now();
   let json = '';
   try{ json = JSON.stringify(S); }catch(e){ return; }
   try{ localStorage.setItem('charge_v2', json); }catch(e){}
   if(!cloudOK) return;
+  /* защита: состояние без профиля никогда не затирает облако, где профиль был */
+  if(!S.profile && _cloudHadProfile) return;
   if(_csSaving){ _csPending = true; return; }
   _csSaving = true;
   try{
@@ -719,7 +748,12 @@ async function doSave(){
       if(!r) r = await csSetItem('cs'+gen+'_'+i, chunk); /* один повтор */
       ok = ok && r;
     }
-    if(ok && await csSetItem('cs2_meta', gen+':'+n+':'+json.length)) _csGen = gen;
+    if(ok && await csSetItem('cs2_meta', gen+':'+n+':'+json.length+':'+S.savedAt)) _csGen = gen;
+    if(S.profile){
+      const pj = JSON.stringify(S.profile);
+      if(pj !== _lastProfileJson && pj.length < 4000 && await csSetItem('cs_profile', pj)) _lastProfileJson = pj;
+      _cloudHadProfile = true;
+    }
   }catch(e){}
   _csSaving = false;
   if(_csPending){ _csPending = false; save(true); }
@@ -727,6 +761,54 @@ async function doSave(){
 /* сбрасываем отложенное сохранение на диск/в облако при сворачивании — иначе последние действия терялись при быстром закрытии */
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ clearTimeout(_saveTimer); doSave(); } });
 window.addEventListener('pagehide', ()=>{ clearTimeout(_saveTimer); doSave(); });
+/* ---- живая синхронизация между устройствами (телефон <-> десктоп) ----
+   раньше облако читалось один раз на старте: открытый десктоп показывал старое
+   и мог затереть свежее с телефона своим устаревшим состоянием */
+async function cloudPeek(){
+  try{
+    const meta = await csGetItems(['cs2_meta']);
+    if(meta && meta.cs2_meta) return parseInt(String(meta.cs2_meta).split(':')[3])||0;
+  }catch(e){}
+  return 0;
+}
+function mergeStates(base, remote){
+  /* наши ключи поверх чужих; дневные журналы — объединение по датам, чтобы дни с другого устройства не пропадали */
+  const out = Object.assign({}, remote, base);
+  ['foodLog','waterLog','stepsLog','workoutLog','foodFreq'].forEach(k=>{
+    out[k] = Object.assign({}, remote && remote[k] || {}, base && base[k] || {});
+  });
+  if(remote && remote.weightLog && base && base.weightLog){
+    const seen = new Set(base.weightLog.map(x=>x.date));
+    out.weightLog = base.weightLog.concat(remote.weightLog.filter(x=>!seen.has(x.date)));
+  }
+  return out;
+}
+let _syncBusy = false;
+async function syncFromCloud(){
+  if(!cloudOK || _syncBusy || _csSaving) return;
+  const so = document.getElementById('sheetOverlay'), mo = document.getElementById('modalOverlay');
+  if((so && so.classList.contains('open')) || (mo && mo.classList.contains('open'))) return; /* не дёргаем экран под открытой шторкой */
+  _syncBusy = true;
+  try{
+    const ts = await cloudPeek();
+    if(ts > (S.savedAt||0)){
+      const remote = await cloudRead();
+      if(remote && (remote.savedAt||0) > (S.savedAt||0)){
+        const hadProfile = !!S.profile;
+        S = mergeStates(remote, S);
+        S.savedAt = remote.savedAt;
+        try{ localStorage.setItem('charge_v2', JSON.stringify(S)); }catch(e){}
+        applyTheme();
+        if(S.profile && !hadProfile && typeof renderMain==='function') renderMain();
+        else if(S.profile && typeof renderTab==='function') renderTab();
+      }
+    }
+  }catch(e){}
+  _syncBusy = false;
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') syncFromCloud(); });
+window.addEventListener('focus', ()=>syncFromCloud());
+setInterval(()=>{ if(document.visibilityState==='visible') syncFromCloud(); }, 20000);
 window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') doSave(); });
 
 /* ================= Состояние ================= */
@@ -744,6 +826,44 @@ let S = {
   goalShown:false
 };
 let ui = { tab:'home', settingsTab:'profile' };
+
+/* ================= Доступ: подписка на канал + пробный период =================
+   Проверка живёт на сервере (Supabase Edge Function) — там проверяется подпись
+   Telegram initData и членство в канале через Bot API. Обойти через клиент нельзя.
+   Пока ACCESS_FN_URL пуст — проверка выключена и приложение работает как раньше. */
+const ACCESS_FN_URL = 'https://clolqywsqbggnkyikjaq.supabase.co/functions/v1/check-access'; /* ВСТАВЬ: https://<project-ref>.supabase.co/functions/v1/check-access */
+const CHANNEL_LINK = 'https://t.me/+V3rNhsYnibI3ODYy';  /* ВСТАВЬ: ссылка-приглашение в закрытый канал, напр. https://t.me/+AbCdEf123 */
+async function checkAccess(){
+  if(!ACCESS_FN_URL || !tg || !tg.initData) return {access:'member'};
+  try{
+    const r = await fetch(ACCESS_FN_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ initData: tg.initData }) });
+    const j = await r.json();
+    if(j && j.access){ S.accessCache = { v:j, at:Date.now() }; save(); return j; }
+  }catch(e){}
+  /* сеть/функция недоступны — не запираем подписчика: 48 часов живём на последнем ответе */
+  if(S.accessCache && Date.now()-S.accessCache.at < 48*3600e3) return S.accessCache.v;
+  return {access:'member'};
+}
+function renderLock(expired){
+  app.innerHTML = `
+    <div class="lock-screen">
+      <div class="lock-logo">⚡</div>
+      <div class="ob-title">Доступ по подписке</div>
+      <div class="ob-sub">${expired==='trial_over' ? 'Пробные 3 недели закончились. ' : ''}Приложение доступно подписчикам закрытого канала — вступай и продолжай сушку. Твои данные сохранены и никуда не денутся</div>
+      <button class="btn-primary" data-act="joinChannel">Вступить в канал</button>
+      <button class="btn-secondary" data-act="recheckAccess">Я подписан — проверить</button>
+    </div>`;
+}
+ACTIONS.joinChannel = ()=>{
+  if(!CHANNEL_LINK){ showToast('Ссылка на канал не настроена'); return; }
+  if(tg && tg.openTelegramLink) tg.openTelegramLink(CHANNEL_LINK); else window.open(CHANNEL_LINK, '_blank');
+};
+ACTIONS.recheckAccess = async ()=>{
+  showToast('Проверяем…');
+  const a = await checkAccess();
+  if(a && a.access!=='expired') location.reload();
+  else showToast('Подписка не найдена — вступи в канал и попробуй снова');
+};
 let editDs = null; /* дата, для которой редактируется питание (null = сегодня) */
 function logDs(){ return editDs || todayStr(); }
 
@@ -1236,7 +1356,10 @@ async function init(){
   applyTheme();
   if(tg && tg.onEvent) tg.onEvent('themeChanged', applyTheme);
   loadPublicFoods(); // подтягиваем общую базу продуктов в фоне, не блокируя старт
+  const acc = await checkAccess();
   app.classList.add('appear');
+  if(acc && acc.access==='expired'){ renderLock(acc.reason||'trial_over'); return; }
+  if(acc && acc.access==='trial' && acc.daysLeft!=null) setTimeout(()=>showToast('Пробный период — осталось дней: '+acc.daysLeft), 800);
   if(!S.profile){ renderOnboarding(0); }
   else{
     const t = params.get('tab');
@@ -2763,8 +2886,10 @@ ACTIONS.confirmReset = async ()=>{
   S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false };
   try{ localStorage.removeItem('charge_v2'); }catch(e){}
   if(cloudOK){
-    const keys = ['cs_meta']; for(let i=0;i<CS_MAX;i++) keys.push('cs_'+i);
-    await csRemoveItems(keys);
+    const keys = ['cs_meta','cs2_meta','cs_profile'];
+    for(let i=0;i<CS_MAX;i++){ keys.push('cs_'+i); keys.push('csA_'+i); keys.push('csB_'+i); }
+    for(let i=0;i<keys.length;i+=50) await csRemoveItems(keys.slice(i,i+50));
+    _cloudHadProfile = false; _lastProfileJson = '';
   }
   closeModal(); applyTheme();
   renderOnboarding(0);
