@@ -109,7 +109,11 @@ body{
 #mainContent > *{ flex-shrink:0; }
 #mainContent > .screen{ flex:1 0 auto; }
 /* контент всегда на 1px выше контейнера — иначе короткие вкладки не скроллятся и не пружинят внизу */
-#mainContent::after{ content:''; flex:0 0 1px; }
+#mainContent::after{ content:''; flex:0 0 2px; }
+#mainContent.enter-right{ animation:slideInRight .38s var(--ease-out) backwards; }
+#mainContent.enter-left{ animation:slideInLeft .38s var(--ease-out) backwards; }
+@keyframes slideInRight{ from{ opacity:0; transform:translateX(70px); } to{ opacity:1; transform:translateX(0); } }
+@keyframes slideInLeft{ from{ opacity:0; transform:translateX(-70px); } to{ opacity:1; transform:translateX(0); } }
 button{ font-family:inherit; }
 input,textarea,select{ font-family:inherit; }
 .hidden{ display:none !important; }
@@ -1685,12 +1689,62 @@ function renderMain(){
 
   /* Pull-to-refresh — iOS-ощущение "spring" без перезагрузки */
   const mc = document.getElementById('mainContent');
+
+  /* Свайп влево/вправо по экрану — переключение разделов.
+     Не трогаем: свайп-удаление продуктов, поля ввода, горизонтальные ленты */
+  const ts = { x:0, y:0, dx:0, mode:null, skip:false };
+  mc.addEventListener('touchstart', e=>{
+    ts.mode = null; ts.dx = 0; ts.skip = false;
+    ts.x = e.touches[0].clientX; ts.y = e.touches[0].clientY;
+    let el = e.target;
+    while(el && el!==mc){
+      if(el.classList && el.classList.contains('swipe-row')){ ts.skip = true; break; }
+      if(el.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)){ ts.skip = true; break; }
+      if(el.scrollWidth > el.clientWidth + 2){ ts.skip = true; break; }
+      el = el.parentElement;
+    }
+  }, {passive:true});
+  mc.addEventListener('touchmove', e=>{
+    if(ts.skip) return;
+    const dx = e.touches[0].clientX - ts.x, dy = e.touches[0].clientY - ts.y;
+    if(ts.mode===null && (Math.abs(dx)>10 || Math.abs(dy)>10)) ts.mode = Math.abs(dx) > Math.abs(dy)*1.2 ? 'h' : 'v';
+    if(ts.mode!=='h') return;
+    ts.dx = dx;
+    mc.style.transition = 'none';
+    mc.style.transform = `translateX(${dx*0.35}px)`;
+    mc.style.opacity = String(Math.max(0.55, 1 - Math.abs(dx)/600));
+  }, {passive:true});
+  mc.addEventListener('touchend', ()=>{
+    if(ts.skip || ts.mode!=='h'){ ts.mode = null; return; }
+    const dir = ts.dx < 0 ? 1 : -1;
+    const order = NAV.map(n=>n.t);
+    const i = order.indexOf(ui.tab), j = i + dir;
+    if(Math.abs(ts.dx) > 70 && j>=0 && j<order.length){
+      mc.style.transition = 'transform .16s ease-in, opacity .16s ease-in';
+      mc.style.transform = `translateX(${dir*-70}px)`;
+      mc.style.opacity = '0';
+      setTimeout(()=>{
+        ui.tab = order[j];
+        haptic('light');
+        mc.style.transition = 'none';
+        mc.style.transform = ''; mc.style.opacity = '';
+        renderTab(dir);
+        setTimeout(()=>{ mc.style.transition = ''; }, 50);
+      }, 165);
+    } else {
+      mc.style.transition = 'transform .35s var(--spring), opacity .25s ease';
+      mc.style.transform = ''; mc.style.opacity = '';
+      setTimeout(()=>{ mc.style.transition = ''; }, 400);
+    }
+    ts.mode = null; ts.dx = 0;
+  }, {passive:true});
+
   let ptr = { startY:0, pulling:false };
   mc.addEventListener('touchstart', e=>{ if(mc.scrollTop===0) ptr.startY = e.touches[0].clientY; }, {passive:true});
   mc.addEventListener('touchmove', e=>{
     if(!ptr.startY) return;
     const dy = e.touches[0].clientY - ptr.startY;
-    if(dy > 8 && mc.scrollTop===0){
+    if(dy > 8 && mc.scrollTop===0 && ts.mode!=='h'){
       ptr.pulling = true;
       const pull = Math.min(dy*0.35, 60);
       mc.style.transform = `translateY(${pull}px)`;
@@ -1707,16 +1761,16 @@ function renderMain(){
   }, {passive:true});
 }
 
-function renderTab(){
+function renderTab(dir){
   document.querySelectorAll('.nav-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===ui.tab));
   const bnav = document.getElementById('bottomNav');
   if(bnav) bnav.querySelectorAll('.nav-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===ui.tab));
   const c = document.getElementById('mainContent');
   const tab = TABS[ui.tab] || TABS.home;
   c.innerHTML = tab.html();
-  c.classList.remove('screen-enter');
+  c.classList.remove('screen-enter','enter-right','enter-left');
   void c.offsetWidth;
-  c.classList.add('screen-enter');
+  c.classList.add(dir===1 ? 'enter-right' : dir===-1 ? 'enter-left' : 'screen-enter');
   if(tab.bind) tab.bind();
 }
 ACTIONS.goTab = (arg)=>{ ui.tab = arg; renderTab(); };
