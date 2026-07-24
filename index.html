@@ -546,6 +546,18 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 .cal-dot{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; background:var(--divider); }
 .cal-dot.ok{ background:var(--green); } .cal-dot.warn{ background:#ffc247; } .cal-dot.bad{ background:var(--red); } .cal-dot.frozen{ background:#69b7ff; }
 
+
+/* свайп-удаление продуктов */
+.swipe-row{ position:relative; overflow:hidden; }
+.swipe-row .log-item{ position:relative; will-change:transform; touch-action:pan-y; }
+.swipe-row:last-of-type .log-item{ border-bottom:none; }
+.swipe-del{ position:absolute; top:6px; bottom:6px; right:0; width:86px; border:none; border-radius:14px; background:var(--red); color:#fff; display:flex; align-items:center; justify-content:center; transform:translateX(92px); cursor:pointer; z-index:0; padding:0; }
+.swipe-del svg{ pointer-events:none; }
+@media (hover: none) and (pointer: coarse){ .swipe-row .log-del{ display:none; } }
+/* фонарик на сканере */
+.scan-wrap{ position:relative; }
+.torch-btn{ position:absolute; top:12px; right:12px; width:42px; height:42px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff; display:none; align-items:center; justify-content:center; z-index:5; cursor:pointer; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.torch-btn.on{ background:#fff; color:#000; }
 </style>
 </head>
 <body>
@@ -872,6 +884,7 @@ async function gateRecheckAccess(){
 };
 let editDs = null; /* дата, для которой редактируется питание (null = сегодня) */
 function logDs(){ return editDs || todayStr(); }
+const TRASH_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 
 function todayStr(d){ d = d || new Date(); const off = d.getTimezoneOffset(); const l = new Date(d.getTime()-off*60000); return l.toISOString().slice(0,10); }
 function fmtDate(dstr){ const d = new Date(dstr+'T00:00:00'); return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'}); }
@@ -2024,7 +2037,7 @@ function workoutItemHtml(w,i){
 TABS.activity = { html: renderActivityTab };
 
 ACTIONS.delWorkout = (arg)=>{
-  const ds = todayStr();
+  const ds = logDs();
   (S.workoutLog[ds]||[]).splice(parseInt(arg),1);
   save(); renderTab();
   if(document.getElementById('sheetOverlay').classList.contains('open')) openSheet(workoutsHtml());
@@ -2032,34 +2045,37 @@ ACTIONS.delWorkout = (arg)=>{
 ACTIONS.saveSteps = ()=>{
   const v = parseInt(document.getElementById('stepsInput').value);
   if(!(v>=0 && v<100000)){ showToast('Введи число шагов'); return; }
-  S.stepsLog[todayStr()] = v;
+  S.stepsLog[logDs()] = v;
   save(); closeModal(); renderTab(); haptic('ok');
+  if(editDs) openSheet(dayEditorHtml(editDs));
 };
 
 /* импорт шагов из Apple Health / Fitness */
 ACTIONS.importSteps = ()=>{
   openModal(`
-    <div class="modal-title">Шаги за сегодня</div>
+    <div class="modal-title">Шаги за ${editDs? fmtDate(editDs) : 'сегодня'}</div>
     <div class="modal-text">1. Открой «Здоровье» (Health) или «Фитнес» (Fitness) на iPhone<br>2. Посмотри число шагов за сегодня<br>3. Введи его сюда — расход калорий пересчитается автоматически</div>
-    <input class="plain-input" id="stepsInput" type="number" inputmode="numeric" placeholder="${daySteps(todayStr())||8000}" style="margin-top:12px">
+    <input class="plain-input" id="stepsInput" type="number" inputmode="numeric" placeholder="${daySteps(logDs())||8000}" style="margin-top:12px">
     <button class="btn-primary" style="margin-top:14px" data-act="saveSteps">Записать</button>
     <div class="settings-hint" style="margin-top:10px; text-align:center">Apple не даёт мини-приложениям прямой доступ к HealthKit, поэтому число переносится вручную</div>`);
 };
 
 /* ---- тренировки ---- */
 function workoutsHtml(){
-  const ds = todayStr();
+  const ds = logDs();
   const list = S.workoutLog[ds] || [];
   return `
-    <div class="sheet-title">Тренировки</div>
+    <div class="sheet-title">Тренировки${editDs? ' · '+fmtDate(editDs) : ''}</div>
     ${list.length
       ? list.map((w,i)=>workoutItemHtml(w,i)).join('')
-      : '<div class="empty-mid">Сегодня тренировок ещё не было</div>'}
+      : `<div class="empty-mid">${editDs? 'В этот день тренировок не записано' : 'Сегодня тренировок ещё не было'}</div>`}
     <div class="actions-grid" style="margin-top:16px">
       <button class="btn-primary" data-act="formWorkout">Добавить тренировку</button>
+      ${editDs? '<button class="btn-secondary" data-act="backToDay">Вернуться к дню</button>' : ''}
     </div>`;
 }
 ACTIONS.openWorkouts = ()=> openSheet(workoutsHtml());
+ACTIONS.backToDay = ()=>{ if(editDs) openSheet(dayEditorHtml(editDs)); };
 
 /* Виды активности. MET на 4 уровня тяжести; perKm — точный расчёт по дистанции */
 const ACTS = [
@@ -2215,7 +2231,7 @@ ACTIONS.saveWorkout = ()=>{
   const parts = [EFFORTS[wDraft.eff].n.toLowerCase()];
   if(a.k==='strength') parts.push(wDraft.muscles.map(i=>MUSCLE_ZONES[i].n.toLowerCase()).join(', '));
   if(a.dist && wDraft.km>0) parts.push(r1(wDraft.km)+' км');
-  const ds = todayStr();
+  const ds = logDs();
   (S.workoutLog[ds] = S.workoutLog[ds]||[]).push({
     kind:a.k, label, mins:wDraft.mins, detail:parts.join(' · '), kcal:workoutKcal(), time:nowTime()
   });
@@ -2236,11 +2252,14 @@ function renderFoodTab(){
       <button class="btn-primary rise" data-act="openAddFood">Добавить еду</button>
       <div class="section-title">Съедено сегодня:</div>
       ${items.length? items.map((it,i)=>`
-        <div class="log-item rise" style="animation-delay:${Math.min(i*0.04,0.3)}s" data-act="editLogItem" data-arg="${i}">
-          <div class="log-emoji">${it.emoji||'🍽'}</div>
-          <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
-          <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
-          <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
+        <div class="swipe-row rise" style="animation-delay:${Math.min(i*0.04,0.3)}s">
+          <div class="log-item" data-act="editLogItem" data-arg="${i}">
+            <div class="log-emoji">${it.emoji||'🍽'}</div>
+            <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
+            <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
+            <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
+          </div>
+          <button class="swipe-del" data-act="delFood" data-arg="${i}">${TRASH_SVG}</button>
         </div>`).join('')
       : '<div class="empty-hint">Пока пусто. Добавь первый приём пищи!</div>'}
     </div>`;
@@ -2275,6 +2294,60 @@ ACTIONS.saveLogGrams = (arg)=>{
   if(editDs) openSheet(dayEditorHtml(editDs));
   showToast(`${it.name}: ${it.grams} г · ${it.kcal} ккал`);
 };
+
+/* ---- свайп влево для удаления продукта (как в iOS) ---- */
+const SWIPE_W = 92;
+let swRow=null, swX=0, swY=0, swBase=0, swDx=0, swMode=null, swOpen=null, swSuppress=false;
+function swSet(row, dx, anim){
+  const it = row.querySelector('.log-item'), del = row.querySelector('.swipe-del');
+  if(!it || !del) return;
+  const tr = anim ? 'transform .28s cubic-bezier(.25,.8,.25,1)' : 'none';
+  it.style.transition = tr; del.style.transition = tr;
+  it.style.transform = `translateX(${dx}px)`;
+  del.style.transform = `translateX(${SWIPE_W+dx}px)`;
+}
+function swClose(row){
+  if(row && document.contains(row)) swSet(row, 0, true);
+  if(swOpen===row) swOpen = null;
+}
+document.addEventListener('touchstart', (e)=>{
+  const row = e.target.closest ? e.target.closest('.swipe-row') : null;
+  if(swOpen && swOpen!==row) swClose(swOpen);
+  swRow = row; swMode = null; swSuppress = false;
+  if(!row) return;
+  const t = e.touches[0];
+  swX = t.clientX; swY = t.clientY;
+  swBase = (row===swOpen) ? -SWIPE_W : 0;
+  swDx = swBase;
+}, {passive:true});
+document.addEventListener('touchmove', (e)=>{
+  if(!swRow) return;
+  const t = e.touches[0];
+  const dx = t.clientX - swX, dy = t.clientY - swY;
+  if(swMode===null && (Math.abs(dx)>8 || Math.abs(dy)>8)) swMode = Math.abs(dx)>Math.abs(dy) ? 'h' : 'v';
+  if(swMode!=='h') return;
+  e.preventDefault();
+  swDx = Math.max(-SWIPE_W-18, Math.min(0, swBase + dx));
+  swSet(swRow, swDx, false);
+}, {passive:false});
+document.addEventListener('touchend', ()=>{
+  if(!swRow) return;
+  if(swMode==='h'){
+    swSuppress = true;
+    if(swDx < -SWIPE_W*0.45){ swSet(swRow, -SWIPE_W, true); swOpen = swRow; haptic('light'); }
+    else swClose(swRow);
+  }
+  swRow = null; swMode = null;
+}, {passive:true});
+document.addEventListener('click', (e)=>{
+  if(swSuppress){ swSuppress = false; e.stopPropagation(); e.preventDefault(); return; }
+  if(!swOpen) return;
+  const del = e.target.closest ? e.target.closest('.swipe-del') : null;
+  if(del){ swOpen = null; return; } /* дальше сработает delFood из общего диспетчера */
+  const inRow = e.target.closest ? e.target.closest('.swipe-row') : null;
+  if(inRow===swOpen){ swClose(swOpen); e.stopPropagation(); e.preventDefault(); return; }
+  swClose(swOpen);
+}, true);
 
 /* ================= Ранжирование как в рекомендациях ================= */
 function freqKey(name){ return name.toLowerCase().trim(); }
@@ -2336,7 +2409,10 @@ function renderFoodTabBody(){
   }
   else if(foodTab==='scan'){
     body.innerHTML = `
-      <div class="scan-box"><video id="scanVideo" playsinline muted></video><div class="scan-frame"></div><div class="scan-line"></div></div>
+      <div class="scan-wrap">
+        <div class="scan-box"><video id="scanVideo" playsinline muted></video><div class="scan-frame"></div><div class="scan-line"></div></div>
+        <button class="torch-btn" id="torchBtn" data-act="toggleTorch"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M13 2 4.5 13.5h5L10 22l8.5-11.5h-5L13 2z"/></svg></button>
+      </div>
       <div class="scan-status" id="scanStatus">Наведи камеру на штрихкод упаковки</div>
       <div class="manual-barcode-row">
         <input class="plain-input" id="manualCode" type="number" inputmode="numeric" placeholder="Или введи код вручную">
@@ -2522,9 +2598,28 @@ function addPickedToLog(grams){
 
 /* ================= Сканер штрихкодов ================= */
 let scannerActive = false;
+let scanTrack = null, torchOn = false;
+function setupTorch(){
+  const btn = document.getElementById('torchBtn');
+  if(!btn) return;
+  torchOn = false; btn.classList.remove('on');
+  let has = false;
+  try{ has = !!(scanTrack && scanTrack.getCapabilities && scanTrack.getCapabilities().torch); }catch(e){}
+  btn.style.display = has ? 'flex' : 'none';
+}
+ACTIONS.toggleTorch = ()=>{
+  if(!scanTrack) return;
+  const btn = document.getElementById('torchBtn');
+  const want = !torchOn;
+  scanTrack.applyConstraints({ advanced:[{ torch: want }] })
+    .then(()=>{ torchOn = want; if(btn) btn.classList.toggle('on', torchOn); haptic('light'); })
+    .catch(()=>{ showToast('Фонарик недоступен на этом устройстве'); });
+};
 function stopScanner(){
   if(scannerActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} }
   scannerActive = false;
+  if(scanTrack){ try{ scanTrack.applyConstraints({advanced:[{torch:false}]}); }catch(e){} }
+  scanTrack = null; torchOn = false;
 }
 function loadQuagga(){
   return new Promise((res, rej)=>{
@@ -2549,16 +2644,17 @@ async function startScanner(){
       video.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:20px;';
       scanBox.innerHTML = ''; scanBox.appendChild(video);
       scannerActive = true;
+      scanTrack = stream.getVideoTracks()[0]; setupTorch();
       const detector = new BarcodeDetector({ formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf'] });
       let lastCode = '', hits = 0;
       const scan = async ()=>{
-        if(!scannerActive){ stream.getTracks().forEach(t=>t.stop()); return; }
+        if(!scannerActive){ stream.getTracks().forEach(t=>t.stop()); scanTrack = null; return; }
         try{
           const codes = await detector.detect(video);
           if(codes.length){
             const code = codes[0].rawValue;
             if(code===lastCode) hits++; else { lastCode = code; hits = 1; }
-            if(hits>=2){ scannerActive = false; stream.getTracks().forEach(t=>t.stop()); handleBarcode(code); return; }
+            if(hits>=2){ scannerActive = false; stream.getTracks().forEach(t=>t.stop()); scanTrack = null; handleBarcode(code); return; }
           }
         }catch(_){}
         requestAnimationFrame(scan);
@@ -2582,6 +2678,8 @@ async function startScanner(){
       if(err){ if(status) status.textContent = 'Камера недоступна — введи код вручную'; return; }
       scannerActive = true;
       Quagga.start();
+      try{ scanTrack = (Quagga.CameraAccess && Quagga.CameraAccess.getActiveTrack) ? Quagga.CameraAccess.getActiveTrack() : null; }catch(e){ scanTrack = null; }
+      setupTorch();
       if(status) status.textContent = 'Наведи камеру на штрихкод';
       let lastCode = '', hits = 0;
       Quagga.onDetected((data)=>{
@@ -2679,7 +2777,9 @@ function renderStatsTab(){
   const p = S.profile;
   const goal = goalCalories(p);
   const days30 = lastDays(30);
-  const withFood = days30.filter(d=>dayItems(d).length>0);
+  /* в средних — только завершённые дни с записанной едой: пустые дни и сегодняшний незаконченный день искажают среднее */
+  let withFood = days30.filter(d=>d!==todayStr() && dayTotal(d)>0);
+  if(!withFood.length) withFood = days30.filter(d=>dayTotal(d)>0);
   const avgDef = withFood.length? Math.round(withFood.reduce((s,d)=>s+dayDeficit(d),0)/withFood.length) : 0;
   const avgP = withFood.length? Math.round(withFood.reduce((s,d)=>s+dayMacro(d,'p'),0)/withFood.length) : 0;
   const cutoff = todayStr(new Date(Date.now()-30*86400000));
@@ -2753,15 +2853,22 @@ function dayEditorHtml(ds){
   const w = (S.workoutLog[ds]||[]).length;
   return `
     <div class="sheet-title">${fmtDate(ds)}</div>
-    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал${w?` · тренировок: ${w}`:''} · нажми на продукт, чтобы изменить граммовку</div>`
+    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал${w?` · тренировок: ${w}`:''}${daySteps(ds)?` · шагов: ${daySteps(ds).toLocaleString('ru-RU')}`:''}${dayBurned(ds)?` · сожжено ~${dayBurned(ds)} ккал`:''} · нажми на продукт, чтобы изменить граммовку</div>`
     + (items.length ? items.map((it,i)=>`
-      <div class="log-item" data-act="editLogItem" data-arg="${i}">
-        <div class="log-emoji">${it.emoji||'🍽'}</div>
-        <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
-        <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
-        <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
+      <div class="swipe-row">
+        <div class="log-item" data-act="editLogItem" data-arg="${i}">
+          <div class="log-emoji">${it.emoji||'🍽'}</div>
+          <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
+          <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
+          <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
+        </div>
+        <button class="swipe-del" data-act="delFood" data-arg="${i}">${TRASH_SVG}</button>
       </div>`).join('') : `<div class="empty-hint">В этот день записей нет — добавь еду</div>`)
-    + `<button class="btn-primary" style="margin-top:14px" data-act="openAddFoodForDay">Добавить еду</button>`;
+    + `<button class="btn-primary" style="margin-top:14px" data-act="openAddFoodForDay">Добавить еду</button>
+    <div class="import-row2" style="margin-top:10px">
+      <button class="btn-secondary" data-act="importSteps">Шаги</button>
+      <button class="btn-secondary" data-act="openWorkouts">Тренировки</button>
+    </div>`;
 }
 ACTIONS.openDay = (arg)=>{
   if(!arg || !S.profile) return;
