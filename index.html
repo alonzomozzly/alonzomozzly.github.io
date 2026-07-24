@@ -552,7 +552,8 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 .swipe-row .log-item{ position:relative; will-change:transform; touch-action:pan-y; }
 .swipe-row:last-of-type .log-item{ border-bottom:none; }
 .swipe-del{ position:absolute; top:6px; bottom:6px; right:0; width:86px; border:none; border-radius:14px; background:var(--red); color:#fff; display:flex; align-items:center; justify-content:center; transform:translateX(92px); cursor:pointer; z-index:0; padding:0; }
-.swipe-del svg{ pointer-events:none; }
+.swipe-del svg{ pointer-events:none; transition:transform .15s ease; }
+.swipe-del.armed svg{ transform:scale(1.3); }
 @media (hover: none) and (pointer: coarse){ .swipe-row .log-del{ display:none; } }
 /* фонарик на сканере */
 .scan-wrap{ position:relative; }
@@ -1445,7 +1446,7 @@ ACTIONS.closeModal = closeModal;
 
 /* ================= Демо-данные (?demo=1, только для предпросмотра) ================= */
 function seedDemo(){
-  S.profile = { gender:'male', age:25, height:181, weight:79.4, activity:'medium', goal:'moderate', name:'Тайлер', targetWeight:74, calorieAdjust:0 };
+  S.profile = { gender:'male', age:25, height:181, weight:79.4, activity:'medium', goal:'moderate', name:'Тайлер', targetWeight:74, calorieAdjust:0, actV2:1 };
   const menu = [
     {name:'Куриная грудка (варёная)', emoji:'🍗', kcal:330, p:62, c:0, f:7, na:128, k:700},
     {name:'Гречка отварная', emoji:'🍛', kcal:275, p:10, c:52, f:3, na:10, k:375},
@@ -1482,7 +1483,7 @@ async function init(){
   }catch(e){}
   if(!S.profile && params.get('demo')==='1') seedDemo();
   /* миграция старых уровней активности на новую шкалу */
-  if(S.profile && !S.profile.actV2){ const remap = {low:'min', medium:'low', high:'medium'}; if(remap[S.profile.activity]) S.profile.activity = remap[S.profile.activity]; S.profile.actV2 = 1; }
+  if(S.profile && !S.profile.actV2){ const remap = {low:'min', medium:'low', high:'medium'}; if(remap[S.profile.activity]) S.profile.activity = remap[S.profile.activity]; S.profile.actV2 = 1; save(); }
   if(params.get('dark')==='1') S.theme.dark = true; // служебное: предпросмотр тёмной темы
   if(params.get('accent')) S.theme.accent = params.get('accent'); // служебное: предпросмотр акцента
   applyTheme();
@@ -1647,7 +1648,7 @@ function renderOnboarding(step){
       gender:obDraft.gender, age:obDraft.age, height:obDraft.height, weight:obDraft.weight,
       activity:obDraft.activity, goal:obDraft.goal, name:obDraft.name.trim(),
       targetWeight: r1(obDraft.weight - (obDraft.gender==='female'?1.5:2.5)),
-      calorieAdjust:0
+      calorieAdjust:0, actV2:1
     };
     S.weightLog = [{date:todayStr(), weight:S.profile.weight}];
     save(true);
@@ -2295,58 +2296,73 @@ ACTIONS.saveLogGrams = (arg)=>{
   showToast(`${it.name}: ${it.grams} г · ${it.kcal} ккал`);
 };
 
-/* ---- свайп влево для удаления продукта (как в iOS) ---- */
+/* ---- свайп влево: дотянул до порога и отпустил — продукт удаляется сам (как в iOS) ---- */
 const SWIPE_W = 92;
-let swRow=null, swX=0, swY=0, swBase=0, swDx=0, swMode=null, swOpen=null, swSuppress=false;
+let swRow=null, swX=0, swY=0, swDx=0, swMode=null, swArmed=false, swSuppress=false, swBusy=false;
 function swSet(row, dx, anim){
   const it = row.querySelector('.log-item'), del = row.querySelector('.swipe-del');
   if(!it || !del) return;
-  const tr = anim ? 'transform .28s cubic-bezier(.25,.8,.25,1)' : 'none';
+  const tr = anim ? 'transform .24s cubic-bezier(.25,.8,.25,1), width .24s cubic-bezier(.25,.8,.25,1)' : 'none';
   it.style.transition = tr; del.style.transition = tr;
   it.style.transform = `translateX(${dx}px)`;
-  del.style.transform = `translateX(${SWIPE_W+dx}px)`;
+  del.style.transform = `translateX(${Math.max(0, SWIPE_W+dx)}px)`;
+  /* плашка растягивается вслед за пальцем, чтобы не оставалось пустоты */
+  del.style.width = (SWIPE_W+dx < 0 ? 86 - (SWIPE_W+dx) : 86) + 'px';
 }
-function swClose(row){
-  if(row && document.contains(row)) swSet(row, 0, true);
-  if(swOpen===row) swOpen = null;
+function swThreshold(row){ return Math.min(row.offsetWidth*0.4, 150); }
+function swDelete(row){
+  swBusy = true;
+  const it = row.querySelector('.log-item');
+  const arg = it ? it.dataset.arg : null;
+  swSet(row, -row.offsetWidth, true);
+  row.style.height = row.offsetHeight + 'px';
+  row.offsetHeight; /* reflow */
+  row.style.transition = 'height .2s ease .14s, opacity .2s ease .14s';
+  row.style.height = '0px';
+  row.style.opacity = '0';
+  haptic('ok');
+  setTimeout(()=>{ swBusy = false; if(arg!=null && ACTIONS.delFood) ACTIONS.delFood(arg); }, 350);
 }
 document.addEventListener('touchstart', (e)=>{
+  if(swBusy){ swRow = null; return; }
   const row = e.target.closest ? e.target.closest('.swipe-row') : null;
-  if(swOpen && swOpen!==row) swClose(swOpen);
-  swRow = row; swMode = null; swSuppress = false;
+  swRow = row; swMode = null; swArmed = false; swSuppress = false;
   if(!row) return;
   const t = e.touches[0];
-  swX = t.clientX; swY = t.clientY;
-  swBase = (row===swOpen) ? -SWIPE_W : 0;
-  swDx = swBase;
+  swX = t.clientX; swY = t.clientY; swDx = 0;
 }, {passive:true});
 document.addEventListener('touchmove', (e)=>{
-  if(!swRow) return;
+  if(!swRow || swBusy) return;
   const t = e.touches[0];
   const dx = t.clientX - swX, dy = t.clientY - swY;
   if(swMode===null && (Math.abs(dx)>8 || Math.abs(dy)>8)) swMode = Math.abs(dx)>Math.abs(dy) ? 'h' : 'v';
   if(swMode!=='h') return;
   e.preventDefault();
-  swDx = Math.max(-SWIPE_W-18, Math.min(0, swBase + dx));
+  swDx = Math.min(0, dx);
   swSet(swRow, swDx, false);
+  const armed = swDx < -swThreshold(swRow);
+  if(armed!==swArmed){
+    swArmed = armed;
+    haptic('light');
+    const del = swRow.querySelector('.swipe-del');
+    if(del) del.classList.toggle('armed', armed);
+  }
 }, {passive:false});
 document.addEventListener('touchend', ()=>{
-  if(!swRow) return;
+  if(!swRow || swBusy){ swRow = null; swMode = null; return; }
   if(swMode==='h'){
     swSuppress = true;
-    if(swDx < -SWIPE_W*0.45){ swSet(swRow, -SWIPE_W, true); swOpen = swRow; haptic('light'); }
-    else swClose(swRow);
+    if(swArmed) swDelete(swRow);
+    else swSet(swRow, 0, true);
   }
   swRow = null; swMode = null;
 }, {passive:true});
+document.addEventListener('touchcancel', ()=>{
+  if(swRow && !swBusy) swSet(swRow, 0, true);
+  swRow = null; swMode = null;
+}, {passive:true});
 document.addEventListener('click', (e)=>{
-  if(swSuppress){ swSuppress = false; e.stopPropagation(); e.preventDefault(); return; }
-  if(!swOpen) return;
-  const del = e.target.closest ? e.target.closest('.swipe-del') : null;
-  if(del){ swOpen = null; return; } /* дальше сработает delFood из общего диспетчера */
-  const inRow = e.target.closest ? e.target.closest('.swipe-row') : null;
-  if(inRow===swOpen){ swClose(swOpen); e.stopPropagation(); e.preventDefault(); return; }
-  swClose(swOpen);
+  if(swSuppress){ swSuppress = false; e.stopPropagation(); e.preventDefault(); }
 }, true);
 
 /* ================= Ранжирование как в рекомендациях ================= */
