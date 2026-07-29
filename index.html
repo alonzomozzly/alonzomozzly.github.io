@@ -20,7 +20,7 @@
   --shadow:0 1px 2px rgba(20,20,30,.04), 0 8px 24px rgba(20,20,30,.07);
   --shadow-lg:0 12px 40px rgba(20,20,30,.12);
   --radius:22px; --radius-sm:14px;
-  --spring:cubic-bezier(.34,1.45,.5,1); --ease-out:cubic-bezier(.22,1,.36,1);
+  --spring:cubic-bezier(.34,1.45,.5,1); --ease-out:cubic-bezier(.22,1,.36,1); --ios:cubic-bezier(.32,.72,0,1);
   color-scheme:light;
 }
 :root.dark{
@@ -105,15 +105,19 @@ body{
 }
 #app.appear{ animation:appIn .5s var(--ease-out) both; }
 @keyframes appIn{ from{ opacity:0; } to{ opacity:1; } }
-#mainContent{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; display:flex; flex-direction:column; }
+#mainContent{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; display:flex; flex-direction:column;
+  /* нижняя панель закреплена поверх контента — оставляем под неё место во всех разделах */
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  touch-action:pan-y; backface-visibility:hidden; }
 #mainContent > *{ flex-shrink:0; }
 #mainContent > .screen{ flex:1 0 auto; }
 /* контент всегда на 1px выше контейнера — иначе короткие вкладки не скроллятся и не пружинят внизу */
 #mainContent::after{ content:''; flex:0 0 2px; }
-#mainContent.enter-right{ animation:slideInRight .38s var(--ease-out) backwards; }
-#mainContent.enter-left{ animation:slideInLeft .38s var(--ease-out) backwards; }
-@keyframes slideInRight{ from{ opacity:0; transform:translateX(70px); } to{ opacity:1; transform:translateX(0); } }
-@keyframes slideInLeft{ from{ opacity:0; transform:translateX(-70px); } to{ opacity:1; transform:translateX(0); } }
+#mainContent.enter-right{ animation:slideInRight .42s var(--ios) both; }
+#mainContent.enter-left{ animation:slideInLeft .42s var(--ios) both; }
+@keyframes slideInRight{ from{ opacity:.3; transform:translate3d(30px,0,0); } to{ opacity:1; transform:none; } }
+@keyframes slideInLeft{ from{ opacity:.3; transform:translate3d(-30px,0,0); } to{ opacity:1; transform:none; } }
+.swipe-ghost{ border-radius:0; }
 button{ font-family:inherit; }
 input,textarea,select{ font-family:inherit; }
 .hidden{ display:none !important; }
@@ -214,8 +218,8 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .streak-main svg{ width:16px; height:16px; }
 .streak-sub{ font-size:11px; font-weight:600; opacity:.7; }
 .screen{ padding:6px 20px 10px; }
-#mainContent.screen-enter{ animation:screenIn .5s var(--ease-out) both; }
-@keyframes screenIn{ from{ opacity:0; transform:translateY(14px) scale(.988); } to{ opacity:1; transform:none; } }
+#mainContent.screen-enter{ animation:screenIn .38s var(--ios) both; }
+@keyframes screenIn{ from{ opacity:0; transform:translate3d(0,10px,0); } to{ opacity:1; transform:none; } }
 .rise{ animation:riseIn .55s var(--spring) both; }
 @keyframes riseIn{ from{ opacity:0; transform:translateY(16px) scale(.97); } to{ opacity:1; transform:none; } }
 
@@ -367,10 +371,11 @@ input[type=range].hard-slider::-webkit-slider-thumb{ -webkit-appearance:none; wi
 
 /* ---------- Нижняя навигация ---------- */
 .bottom-nav{
-  flex-shrink:0;
+  /* закреплена внизу во ВСЕХ разделах, не уезжает со скроллом */
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:100%; max-width:480px;
   background:var(--bg-elevated); border-top:1px solid var(--divider);
-  display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom)); z-index:40;
-  width:100%;
+  display:flex; padding:8px 4px calc(8px + env(safe-area-inset-bottom)); z-index:60;
 }
 .nav-item{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; border:none; background:none; padding:7px 0; cursor:pointer; color:var(--text-tertiary); }
 .nav-item svg{ width:23px; height:23px; transition:transform .45s var(--spring); }
@@ -658,75 +663,296 @@ function ic(name, sw){
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw||1.9}" stroke-linecap="round" stroke-linejoin="round">${P[name]||''}</svg>`;
 }
 
-/* ================= Хранение =================
-   Правильная схема для публичного хостинга (GitHub Pages):
-   — внутри Telegram: CloudStorage — данные привязаны к конкретному
-     пользователю бота и синхронизируются между его устройствами.
-     Каждый пользователь видит только свои данные.
-   — вне Telegram (браузер): localStorage как запасной вариант.
+/* ================= Хранение и синхронизация =================
+   Данные принадлежат ТЕЛЕГРАМ-АККАУНТУ, а не устройству:
+   — CloudStorage Telegram — единое хранилище аккаунта, одинаковое на всех
+     устройствах (телефон, десктоп, планшет). Ключ localStorage тоже содержит
+     id пользователя, поэтому чужой аккаунт на том же ноутбуке не видит и не
+     затирает твои данные.
+   — состояния НЕ перезаписывают друг друга: они сливаются по элементам
+     (день + запись + метка времени). Поэтому запись с одного устройства
+     физически не может стереть день, добавленный на другом.
+   — если облако не ответило, приложение НИКОГДА не пишет в него своё пустое
+     состояние (именно из-за этого раньше терялся день при входе с нового
+     устройства).
    Значения CloudStorage ограничены 4096 символами — режем на части. */
 const CS_CHUNK = 3500, CS_MAX = 200;
-function csGetItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.getItems(keys,(e,v)=>res(e?null:v)); }catch(_){ res(null); } }); }
+const TG_UID = (function(){ try{ return (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? String(tg.initDataUnsafe.user.id) : ''; }catch(e){ return ''; } })();
+const LS_KEY = TG_UID ? ('charge_v2_u' + TG_UID) : 'charge_v2';
+
+function csGetChunk(keys){ return new Promise(res=>{ try{ tg.CloudStorage.getItems(keys,(e,v)=>res(e?null:v)); }catch(_){ res(null); } }); }
+/* CloudStorage не любит длинные списки ключей — читаем порциями; null = сбой чтения */
+async function csGetItems(keys){
+  const out = {};
+  for(let i=0;i<keys.length;i+=40){
+    const part = await csGetChunk(keys.slice(i,i+40));
+    if(!part) return null;
+    Object.assign(out, part);
+  }
+  return out;
+}
 function csSetItem(k,v){ return new Promise(res=>{ try{ tg.CloudStorage.setItem(k,v,(e,ok)=>res(!e&&ok!==false)); }catch(_){ res(false); } }); }
 function csRemoveItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.removeItems(keys,()=>res(true)); }catch(_){ res(false); } }); }
 
-let _csGen = 'A', _cloudHadProfile = false, _lastProfileJson = '';
+function clone(x){ try{ return x==null? x : JSON.parse(JSON.stringify(x)); }catch(e){ return x; } }
+function newId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+/* ---------- слияние состояний (коммутативно: результат не зависит от порядка) ---------- */
+function itemKey(it){ return it && (it.id || ((it.time||'') + '|' + (it.name||it.label||'') + '|' + (it.kcal||0))); }
+function mergeItemLogs(a, b, tomb){
+  const out = {};
+  const dates = new Set(Object.keys(a||{}).concat(Object.keys(b||{})));
+  dates.forEach(d=>{
+    const map = new Map();
+    const put = (it)=>{
+      const k = itemKey(it);
+      if(!k) return;
+      const prev = map.get(k);
+      if(!prev || (it.upd||0) > (prev.upd||0)) map.set(k, it);
+    };
+    (a && a[d] || []).forEach(put);
+    (b && b[d] || []).forEach(put);
+    const list = [];
+    map.forEach((it,k)=>{ const id = it.id || k; if(!(tomb && tomb[id])) list.push(it); });
+    list.sort((x,y)=> String(x.time||'').localeCompare(String(y.time||'')));
+    if(list.length) out[d] = list; else if((a&&a[d]) || (b&&b[d])) out[d] = [];
+  });
+  return out;
+}
+function mergeNumLog(a, b, sa, sb, prefix){
+  const out = {};
+  const keys = new Set(Object.keys(a||{}).concat(Object.keys(b||{})));
+  keys.forEach(d=>{
+    const ta = (sa && sa[prefix+d]) || 0, tb = (sb && sb[prefix+d]) || 0;
+    let v;
+    if(tb > ta) v = (b||{})[d];
+    else if(ta > tb) v = (a||{})[d];
+    else v = Math.max((a||{})[d]||0, (b||{})[d]||0); /* метки равны — берём большее значение, ничего не теряем */
+    if(v!=null) out[d] = v;
+  });
+  return out;
+}
+function mergeWeights(a, b, sa, sb){
+  const map = new Map();
+  (a||[]).forEach(e=> map.set(e.date, e));
+  (b||[]).forEach(e=>{
+    const cur = map.get(e.date);
+    if(!cur){ map.set(e.date, e); return; }
+    const ta = (sa && sa['weight:'+e.date]) || 0, tb = (sb && sb['weight:'+e.date]) || 0;
+    if(tb > ta) map.set(e.date, e);
+  });
+  return Array.from(map.values()).sort((x,y)=>x.date.localeCompare(y.date));
+}
+function mergeCustomFoods(a, b, tomb){
+  const map = new Map();
+  const put = (f)=>{
+    const k = f.id || ('n:' + String(f.name||'').toLowerCase());
+    const prev = map.get(k);
+    if(!prev || (f.upd||0) > (prev.upd||0)) map.set(k, f);
+  };
+  (a||[]).forEach(put); (b||[]).forEach(put);
+  const out = [];
+  map.forEach((f,k)=>{ if(!(tomb && tomb[f.id || k])) out.push(f); });
+  return out;
+}
+function mergeFreq(a, b){
+  const out = {};
+  const keys = new Set(Object.keys(a||{}).concat(Object.keys(b||{})));
+  keys.forEach(k=>{
+    const x = (a||{})[k], y = (b||{})[k];
+    if(!x){ out[k] = y; return; }
+    if(!y){ out[k] = x; return; }
+    out[k] = {
+      n: Math.max(x.n||0, y.n||0),
+      last: (String(x.last||'') >= String(y.last||'')) ? x.last : y.last,
+      food: (x.n||0) >= (y.n||0) ? x.food : y.food
+    };
+  });
+  return out;
+}
+function mergeStates(a, b){
+  if(!a) return clone(b);
+  if(!b) return clone(a);
+  const sa = a.stamps || {}, sb = b.stamps || {};
+  const out = {};
+  const newer = (k)=> ((sb[k]||0) > (sa[k]||0)) ? b : a; /* при равных метках приоритет у первого (локального) */
+  ['profile','theme','goalShown'].forEach(k=>{ out[k] = clone(newer(k)[k]); });
+  out.stamps = {};
+  Object.keys(sa).concat(Object.keys(sb)).forEach(k=>{ out.stamps[k] = Math.max(sa[k]||0, sb[k]||0); });
+  out.tomb = {};
+  Object.keys(a.tomb||{}).concat(Object.keys(b.tomb||{})).forEach(k=>{ out.tomb[k] = Math.max((a.tomb||{})[k]||0, (b.tomb||{})[k]||0); });
+  out.foodLog = mergeItemLogs(a.foodLog, b.foodLog, out.tomb);
+  out.workoutLog = mergeItemLogs(a.workoutLog, b.workoutLog, out.tomb);
+  out.waterLog = mergeNumLog(a.waterLog, b.waterLog, sa, sb, 'water:');
+  out.stepsLog = mergeNumLog(a.stepsLog, b.stepsLog, sa, sb, 'steps:');
+  out.weightLog = mergeWeights(a.weightLog, b.weightLog, sa, sb);
+  out.customFoods = mergeCustomFoods(a.customFoods, b.customFoods, out.tomb);
+  out.foodFreq = mergeFreq(a.foodFreq, b.foodFreq);
+  out.uid = a.uid || b.uid || '';
+  out.savedAt = Math.max(a.savedAt||0, b.savedAt||0);
+  return out;
+}
+/* подпись содержимого — чтобы понимать, есть ли реальные отличия (без savedAt) */
+function contentSig(st){
+  if(!st) return '';
+  try{
+    return JSON.stringify([st.profile, st.theme, st.goalShown, st.foodLog, st.waterLog, st.stepsLog, st.workoutLog, st.weightLog, st.customFoods, st.tomb]);
+  }catch(e){ return String(Math.random()); }
+}
+
+/* ---------- чтение облака ---------- */
+let _csGen = 'A', _cloudHadProfile = false, _lastProfileJson = '', _cloudReadOK = false;
+async function readGen(metaVal){
+  const [gen, nStr, lenStr] = String(metaVal||'').split(':');
+  const n = parseInt(nStr)||0, len = parseInt(lenStr)||0;
+  if(!(gen==='A'||gen==='B') || !(n>0 && n<=CS_MAX)) return {ok:false, state:null};
+  const keys = Array.from({length:n},(_,i)=>'cs'+gen+'_'+i);
+  const parts = await csGetItems(keys);
+  if(!parts) return {ok:false, state:null};
+  const json = keys.map(k=>parts[k]||'').join('');
+  if(!json || (len && json.length!==len)) return {ok:false, state:null};
+  try{ const st = JSON.parse(json); _csGen = gen; return {ok:true, state:st}; }catch(e){ return {ok:false, state:null}; }
+}
+/* {ok:true, state:null} = облако точно пустое; {ok:false} = прочитать не удалось */
 async function cloudRead(){
   try{
-    const meta = await csGetItems(['cs2_meta','cs_meta']);
-    if(meta && meta.cs2_meta){
-      /* новый формат: генерация:число_кусков:длина — читаем только целостную копию */
-      const [gen, nStr, lenStr] = String(meta.cs2_meta).split(':');
-      const n = parseInt(nStr)||0, len = parseInt(lenStr)||0;
-      if((gen==='A'||gen==='B') && n>0 && n<=CS_MAX){
-        _csGen = gen;
-        const keys = Array.from({length:n},(_,i)=>'cs'+gen+'_'+i);
-        const parts = await csGetItems(keys);
-        if(parts){
-          const json = keys.map(k=>parts[k]||'').join('');
-          if(json.length===len || !len) return JSON.parse(json);
-        }
+    const meta = await csGetItems(['cs2_meta','cs2_meta_prev','cs_meta']);
+    if(!meta) return {ok:false, state:null};
+    if(meta.cs2_meta){
+      const r = await readGen(meta.cs2_meta);
+      if(r.ok) return r;
+      if(meta.cs2_meta_prev){ /* текущая копия побилась — берём предыдущую целую */
+        const p = await readGen(meta.cs2_meta_prev);
+        if(p.ok) return p;
       }
-      return null;
+      return {ok:false, state:null};
     }
-    /* старый формат — совместимость с уже сохранёнными профилями */
-    const n = meta && meta.cs_meta ? (parseInt(meta.cs_meta)||0) : 0;
-    if(n>0 && n<=60){
-      const keys = Array.from({length:n},(_,i)=>'cs_'+i);
-      const parts = await csGetItems(keys);
-      if(parts){ const json = keys.map(k=>parts[k]||'').join(''); if(json) return JSON.parse(json); }
+    if(meta.cs_meta){ /* старый формат — совместимость */
+      const n = parseInt(meta.cs_meta)||0;
+      if(n>0 && n<=60){
+        const keys = Array.from({length:n},(_,i)=>'cs_'+i);
+        const parts = await csGetItems(keys);
+        if(!parts) return {ok:false, state:null};
+        const json = keys.map(k=>parts[k]||'').join('');
+        if(json){ try{ return {ok:true, state:JSON.parse(json)}; }catch(e){ return {ok:false, state:null}; } }
+      }
+      return {ok:false, state:null};
     }
-  }catch(e){}
-  return null;
+    return {ok:true, state:null};
+  }catch(e){ return {ok:false, state:null}; }
 }
-async function storageLoad(){
+
+function readLocal(){
   let local = null;
-  try{ const raw = localStorage.getItem('charge_v2'); if(raw) local = JSON.parse(raw); }catch(e){}
+  try{ const raw = localStorage.getItem(LS_KEY); if(raw) local = JSON.parse(raw); }catch(e){}
+  if(!local && LS_KEY!=='charge_v2'){
+    /* переезд со старого общего ключа — только если он принадлежит этому же аккаунту */
+    try{
+      const raw = localStorage.getItem('charge_v2');
+      if(raw){ const old = JSON.parse(raw); if(old && (!old.uid || !TG_UID || old.uid===TG_UID)) local = old; }
+    }catch(e){}
+  }
+  /* данные другого Telegram-аккаунта на этом устройстве не используем никогда */
+  if(local && local.uid && TG_UID && local.uid !== TG_UID) local = null;
+  return local;
+}
+
+async function storageLoad(){
+  const local = readLocal();
   let cloud = null;
   if(cloudOK){
-    cloud = await cloudRead();
-    if(!cloud) cloud = await cloudRead(); /* повтор на случай сетевого сбоя */
+    let r = await cloudRead();
+    if(!r.ok) r = await cloudRead();
+    if(!r.ok) r = await cloudRead(); /* до трёх попыток: сеть в десктопе бывает медленной */
+    _cloudReadOK = r.ok;
+    cloud = r.state;
+    if(cloud && cloud.uid && TG_UID && cloud.uid !== TG_UID) cloud = null;
   }
-  /* берём самую свежую из двух копий — так заполненный день не потеряется, даже если облачная запись оборвалась */
-  let st = (cloud && local) ? (((cloud.savedAt||0) >= (local.savedAt||0)) ? cloud : local) : (cloud || local);
-  if(st && st.profile) _cloudHadProfile = true;
-  /* бронежилет: профиль лежит ещё и в отдельном маленьком слоте —
-     даже если основные данные побились, аккаунт не слетает в онбординг */
+  /* не выбираем «кто свежее», а СЛИВАЕМ — так день не теряется ни на одном устройстве */
+  let st = mergeStates(local, cloud);
+  if(st && st.profile) _cloudHadProfile = _cloudHadProfile || !!(cloud && cloud.profile);
   if(cloudOK && (!st || !st.profile)){
     try{
       const pr = await csGetItems(['cs_profile']);
       if(pr && pr.cs_profile){
         const prof = JSON.parse(pr.cs_profile);
-        if(prof && prof.gender && prof.height){
-          _cloudHadProfile = true;
-          st = st || {};
-          st.profile = prof;
-        }
+        if(prof && prof.gender && prof.height){ _cloudHadProfile = true; st = st || {}; st.profile = prof; }
       }
     }catch(e){}
   }
+  if(st){ st.uid = TG_UID || st.uid || ''; st.stamps = st.stamps || {}; st.tomb = st.tomb || {}; }
   return st;
 }
+
+/* ---------- авто-метки изменений ---------- */
+let _snap = null;
+function snapshot(st){
+  return {
+    profile: JSON.stringify(st.profile||null),
+    theme: JSON.stringify(st.theme||null),
+    goalShown: JSON.stringify(!!st.goalShown),
+    waterLog: JSON.stringify(st.waterLog||{}),
+    stepsLog: JSON.stringify(st.stepsLog||{}),
+    weightLog: JSON.stringify(st.weightLog||[]),
+    foodLog: JSON.stringify(st.foodLog||{}),
+    workoutLog: JSON.stringify(st.workoutLog||{}),
+    customFoods: JSON.stringify(st.customFoods||[])
+  };
+}
+function stampItemLog(logName, prev, t){
+  const log = S[logName] || {};
+  const prevIds = new Set();
+  Object.keys(prev||{}).forEach(d=> (prev[d]||[]).forEach(it=>{ const k = itemKey(it); if(k) prevIds.add(k); }));
+  const prevById = {};
+  Object.keys(prev||{}).forEach(d=> (prev[d]||[]).forEach(it=>{ const k = itemKey(it); if(k) prevById[k] = it; }));
+  const nowIds = new Set();
+  Object.keys(log).forEach(d=>{
+    (log[d]||[]).forEach(it=>{
+      if(!it.id) it.id = newId();
+      const old = prevById[it.id];
+      if(!old){ it.upd = t; }
+      else {
+        const a = Object.assign({}, it); delete a.upd;
+        const b = Object.assign({}, old); delete b.upd;
+        it.upd = (JSON.stringify(a) !== JSON.stringify(b)) ? t : (old.upd || t);
+      }
+      nowIds.add(it.id);
+    });
+  });
+  /* исчезло локально → это удаление: помечаем, чтобы запись не «вернулась» из облака */
+  prevIds.forEach(id=>{ if(!nowIds.has(id)) S.tomb[id] = t; });
+}
+function autoStamp(){
+  const t = Date.now();
+  S.stamps = S.stamps || {}; S.tomb = S.tomb || {};
+  const cur = snapshot(S);
+  const prev = _snap;
+  ['profile','theme','goalShown'].forEach(k=>{ if(!prev || prev[k]!==cur[k]) S.stamps[k] = t; });
+  ['waterLog','stepsLog'].forEach(k=>{
+    if(prev && prev[k]===cur[k]) return;
+    const before = prev ? JSON.parse(prev[k]) : {};
+    const now = S[k] || {};
+    const pref = (k==='waterLog') ? 'water:' : 'steps:';
+    new Set(Object.keys(before).concat(Object.keys(now))).forEach(d=>{ if(before[d]!==now[d]) S.stamps[pref+d] = t; });
+  });
+  if(!prev || prev.weightLog!==cur.weightLog){
+    const before = {}; (prev? JSON.parse(prev.weightLog) : []).forEach(e=> before[e.date] = e.weight);
+    (S.weightLog||[]).forEach(e=>{ if(before[e.date]!==e.weight) S.stamps['weight:'+e.date] = t; });
+  }
+  if(!prev || prev.customFoods!==cur.customFoods){
+    const before = (prev? JSON.parse(prev.customFoods) : []);
+    const beforeIds = new Set(before.filter(f=>f.id).map(f=>f.id));
+    const nowIds = new Set();
+    (S.customFoods||[]).forEach(f=>{ if(!f.id) f.id = newId(); if(!beforeIds.has(f.id)) f.upd = t; nowIds.add(f.id); });
+    beforeIds.forEach(id=>{ if(!nowIds.has(id)) S.tomb[id] = t; });
+  }
+  if(!prev || prev.foodLog!==cur.foodLog) stampItemLog('foodLog', prev? JSON.parse(prev.foodLog) : {}, t);
+  if(!prev || prev.workoutLog!==cur.workoutLog) stampItemLog('workoutLog', prev? JSON.parse(prev.workoutLog) : {}, t);
+  /* чистим старые «надгробия» — они нужны только пока их могут не увидеть другие устройства */
+  const cutTs = t - 120*86400000;
+  Object.keys(S.tomb).forEach(id=>{ if((S.tomb[id]||0) < cutTs) delete S.tomb[id]; });
+}
+
 let _saveTimer = null, _csSaving = false, _csPending = false;
 function save(now){ clearTimeout(_saveTimer); _saveTimer = setTimeout(doSave, now?0:400); }
 function pruneHistory(){
@@ -739,38 +965,58 @@ function pruneHistory(){
     keys.slice(250).forEach(k=> delete S.foodFreq[k]);
   }
 }
+function saveLocal(json){ try{ localStorage.setItem(LS_KEY, json); }catch(e){} }
 async function doSave(){
-  if(cloudOK && !_csSaving){
-    try{
-      const ts = await cloudPeek();
-      if(ts > (S.savedAt||0)){
-        const remote = await cloudRead();
-        if(remote) S = mergeStates(S, remote);
-      }
-    }catch(e){}
-  }
+  autoStamp();
+  S.uid = S.uid || TG_UID || '';
   S.savedAt = Date.now();
   let json = '';
   try{ json = JSON.stringify(S); }catch(e){ return; }
-  try{ localStorage.setItem('charge_v2', json); }catch(e){}
+  saveLocal(json);
+  _snap = snapshot(S);
   if(!cloudOK) return;
-  /* защита: состояние без профиля никогда не затирает облако, где профиль был */
-  if(!S.profile && _cloudHadProfile) return;
   if(_csSaving){ _csPending = true; return; }
   _csSaving = true;
   try{
-    if(json.length > CS_CHUNK*CS_MAX){ pruneHistory(); S.savedAt = Date.now(); json = JSON.stringify(S); try{ localStorage.setItem('charge_v2', json); }catch(e){} }
-    /* пишем в НЕАКТИВНУЮ генерацию и переключаем мету только после успеха всех кусков — старая копия остаётся целой */
+    /* 1) сначала читаем облако и сливаем с локальным — параллельная работа с двух
+          устройств не теряется, а объединяется */
+    const r = await cloudRead();
+    if(r.ok){
+      _cloudReadOK = true;
+      if(r.state && (!r.state.uid || !TG_UID || r.state.uid===TG_UID)){
+        S = mergeStates(S, r.state);
+        if(r.state.profile) _cloudHadProfile = true;
+      }
+    } else if(!_cloudReadOK){
+      /* облако недоступно и мы ни разу его не прочитали — не перезаписываем вслепую */
+      _csSaving = false;
+      if(_csPending){ _csPending = false; }
+      return;
+    }
+    if(!S.profile && _cloudHadProfile){ _csSaving = false; return; }
+    S.uid = TG_UID || S.uid || '';
+    S.savedAt = Date.now();
+    json = JSON.stringify(S);
+    if(json.length > CS_CHUNK*CS_MAX){ pruneHistory(); S.savedAt = Date.now(); json = JSON.stringify(S); }
+    saveLocal(json);
+    _snap = snapshot(S);
+    /* 2) пишем в НЕАКТИВНУЮ генерацию и переключаем мету только после успеха всех
+          кусков — прошлая целая копия всегда остаётся как резерв */
+    const prevMeta = _csGen ? null : null;
     const gen = _csGen==='A' ? 'B' : 'A';
     const n = Math.max(1, Math.ceil(json.length/CS_CHUNK));
     let ok = n<=CS_MAX;
     for(let i=0; i<n && ok; i++){
       const chunk = json.slice(i*CS_CHUNK,(i+1)*CS_CHUNK);
-      let r = await csSetItem('cs'+gen+'_'+i, chunk);
-      if(!r) r = await csSetItem('cs'+gen+'_'+i, chunk); /* один повтор */
-      ok = ok && r;
+      let res = await csSetItem('cs'+gen+'_'+i, chunk);
+      if(!res) res = await csSetItem('cs'+gen+'_'+i, chunk); /* один повтор */
+      ok = ok && res;
     }
-    if(ok && await csSetItem('cs2_meta', gen+':'+n+':'+json.length+':'+S.savedAt)) _csGen = gen;
+    if(ok){
+      const oldMeta = (await csGetItems(['cs2_meta'])) || {};
+      if(oldMeta.cs2_meta) await csSetItem('cs2_meta_prev', oldMeta.cs2_meta);
+      if(await csSetItem('cs2_meta', gen+':'+n+':'+json.length+':'+S.savedAt)) _csGen = gen;
+    }
     if(S.profile){
       const pj = JSON.stringify(S.profile);
       if(pj !== _lastProfileJson && pj.length < 4000 && await csSetItem('cs_profile', pj)) _lastProfileJson = pj;
@@ -780,49 +1026,41 @@ async function doSave(){
   _csSaving = false;
   if(_csPending){ _csPending = false; save(true); }
 }
-/* сбрасываем отложенное сохранение на диск/в облако при сворачивании — иначе последние действия терялись при быстром закрытии */
+/* сбрасываем отложенное сохранение при сворачивании — иначе последние действия терялись */
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ clearTimeout(_saveTimer); doSave(); } });
 window.addEventListener('pagehide', ()=>{ clearTimeout(_saveTimer); doSave(); });
-/* ---- живая синхронизация между устройствами (телефон <-> десктоп) ----
-   раньше облако читалось один раз на старте: открытый десктоп показывал старое
-   и мог затереть свежее с телефона своим устаревшим состоянием */
-async function cloudPeek(){
-  try{
-    const meta = await csGetItems(['cs2_meta']);
-    if(meta && meta.cs2_meta) return parseInt(String(meta.cs2_meta).split(':')[3])||0;
-  }catch(e){}
-  return 0;
-}
-function mergeStates(base, remote){
-  /* наши ключи поверх чужих; дневные журналы — объединение по датам, чтобы дни с другого устройства не пропадали */
-  const out = Object.assign({}, remote, base);
-  ['foodLog','waterLog','stepsLog','workoutLog','foodFreq'].forEach(k=>{
-    out[k] = Object.assign({}, remote && remote[k] || {}, base && base[k] || {});
-  });
-  if(remote && remote.weightLog && base && base.weightLog){
-    const seen = new Set(base.weightLog.map(x=>x.date));
-    out.weightLog = base.weightLog.concat(remote.weightLog.filter(x=>!seen.has(x.date)));
-  }
-  return out;
-}
+
+/* ---- живая синхронизация между устройствами (телефон <-> десктоп) ---- */
 let _syncBusy = false;
 async function syncFromCloud(){
   if(!cloudOK || _syncBusy || _csSaving) return;
+  if(window._swipeBusy) return; /* не дёргаем экран во время жеста */
   const so = document.getElementById('sheetOverlay'), mo = document.getElementById('modalOverlay');
-  if((so && so.classList.contains('open')) || (mo && mo.classList.contains('open'))) return; /* не дёргаем экран под открытой шторкой */
+  if((so && so.classList.contains('open')) || (mo && mo.classList.contains('open'))) return;
   _syncBusy = true;
   try{
-    const ts = await cloudPeek();
-    if(ts > (S.savedAt||0)){
-      const remote = await cloudRead();
-      if(remote && (remote.savedAt||0) > (S.savedAt||0)){
-        const hadProfile = !!S.profile;
-        S = mergeStates(remote, S);
-        S.savedAt = remote.savedAt;
-        try{ localStorage.setItem('charge_v2', JSON.stringify(S)); }catch(e){}
-        applyTheme();
-        if(S.profile && !hadProfile && typeof renderMain==='function') renderMain();
-        else if(S.profile && typeof renderTab==='function') renderTab();
+    const r = await cloudRead();
+    if(r.ok){
+      _cloudReadOK = true;
+      const remote = r.state;
+      if(remote && (!remote.uid || !TG_UID || remote.uid===TG_UID)){
+        if(remote.profile) _cloudHadProfile = true;
+        const before = contentSig(S);
+        const merged = mergeStates(S, remote);
+        const after = contentSig(merged);
+        if(after !== before){
+          const hadProfile = !!S.profile;
+          S = merged;
+          saveLocal(JSON.stringify(S));
+          _snap = snapshot(S);
+          applyTheme();
+          if(S.profile && !hadProfile && typeof renderMain==='function') renderMain();
+          else if(S.profile && typeof renderTab==='function') renderTab();
+        }
+        /* у нас есть то, чего нет в облаке — отправляем */
+        if(contentSig(merged) !== contentSig(remote)) save(true);
+      } else if(!remote && S.profile){
+        save(true); /* облако пустое, а данные есть — заливаем */
       }
     }
   }catch(e){}
@@ -830,8 +1068,8 @@ async function syncFromCloud(){
 }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') syncFromCloud(); });
 window.addEventListener('focus', ()=>syncFromCloud());
-setInterval(()=>{ if(document.visibilityState==='visible') syncFromCloud(); }, 20000);
-window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') doSave(); });
+window.addEventListener('online', ()=>syncFromCloud());
+setInterval(()=>{ if(document.visibilityState==='visible') syncFromCloud(); }, 7000);
 
 /* ================= Состояние ================= */
 let S = {
@@ -845,7 +1083,10 @@ let S = {
   workoutLog:{},       // {'YYYY-MM-DD':[{kind,label,mins,detail,kcal,time}]}
   theme:{dark:null,accent:'orange'},
         // {pct,waist,neck,chest,hip,date}
-  goalShown:false
+  goalShown:false,
+  stamps:{},           // метки времени правок — нужны для слияния между устройствами
+  tomb:{},             // id удалённых записей — чтобы удалённое не возвращалось
+  uid:''               // владелец данных = id Telegram-аккаунта
 };
 let ui = { tab:'home', settingsTab:'profile' };
 
@@ -1295,8 +1536,18 @@ const ACTIVITY_MULT = { min:1.2, low:1.375, medium:1.55, high:1.725, athlete:1.9
 function tdee(p){ return bmr(p) * (ACTIVITY_MULT[p.activity] || 1.375); }
 /* дефицит в процентах от нормы */
 const GOAL_PCT = { maintain:0, slow:0.10, moderate:0.20, fast:0.28 };
-function goalRateKgWeek(p){ return Math.round(tdee(p)*(GOAL_PCT[p.goal]||0)*7/7700*20)/20; }
-function goalCalories(p){ const t = tdee(p)*(1-(GOAL_PCT[p.goal]||0)) + (p.calorieAdjust||0); return Math.round(t/10)*10; }
+/* ручной режим: норма КБЖУ задана в настройках — тогда всё, что зависит от нормы
+   (кольцо, остаток, белок, календарь, аналитика, графики, прогноз и советы)
+   считается от его чисел, а не от формулы */
+function customOn(p){ return !!(p && p.custom && p.custom.on && p.custom.kcal > 0); }
+function goalRateKgWeek(p){
+  if(customOn(p)) return Math.round((tdee(p) - goalCalories(p))*7/7700*20)/20;
+  return Math.round(tdee(p)*(GOAL_PCT[p.goal]||0)*7/7700*20)/20;
+}
+function goalCalories(p){
+  if(customOn(p)) return Math.round(p.custom.kcal);
+  const t = tdee(p)*(1-(GOAL_PCT[p.goal]||0)) + (p.calorieAdjust||0); return Math.round(t/10)*10;
+}
 /* умные нормы БЖУ: при большом лишнем весе белок/жир считаем от «расчётного» веса
    (норма BMI 22 + четверть избытка), а не от фактического — жировая масса белок не требует.
    Углеводы — из остатка калорий, но не меньше 10% нормы */
@@ -1304,7 +1555,7 @@ function leanRefWeight(p){
   const ideal = 22 * Math.pow(p.height/100, 2);
   return p.weight <= ideal ? p.weight : Math.round(ideal + (p.weight-ideal)*0.25);
 }
-function macroTargets(p){
+function autoMacroTargets(p){
   const kcal = goalCalories(p);
   const ref = leanRefWeight(p);
   const protein = Math.round(ref*1.8);
@@ -1313,6 +1564,17 @@ function macroTargets(p){
   const minCarbs = Math.round(kcal*0.10/4);
   if(carbs < minCarbs){ carbs = minCarbs; fat = Math.max(40, Math.round((kcal - protein*4 - carbs*4)/9)); }
   return { protein, fat, carbs: Math.max(carbs, 0) };
+}
+function macroTargets(p){
+  if(customOn(p)){
+    const c = p.custom, auto = autoMacroTargets(p);
+    return {
+      protein: c.p>0 ? Math.round(c.p) : auto.protein,
+      fat:     c.f>0 ? Math.round(c.f) : auto.fat,
+      carbs:   c.c>0 ? Math.round(c.c) : auto.carbs
+    };
+  }
+  return autoMacroTargets(p);
 }
 
 function dayItems(ds){ return S.foodLog[ds] || []; }
@@ -1489,6 +1751,9 @@ async function init(){
     const loaded = await storageLoad();
     if(loaded && typeof loaded==='object') S = Object.assign(S, loaded);
   }catch(e){}
+  S.stamps = S.stamps || {}; S.tomb = S.tomb || {};
+  S.uid = TG_UID || S.uid || '';
+  _snap = snapshot(S); /* базовая точка: дальше каждая правка получает свою метку времени */
   if(!S.profile && params.get('demo')==='1') seedDemo();
   /* миграция старых уровней активности на новую шкалу */
   if(S.profile && !S.profile.actV2){ const remap = {low:'min', medium:'low', high:'medium'}; if(remap[S.profile.activity]) S.profile.activity = remap[S.profile.activity]; S.profile.actV2 = 1; save(); }
@@ -1683,85 +1948,149 @@ function renderMain(){
       ${NAV.map(n=>`<button class="nav-item" data-tab="${n.t}">${ic(n.i)}<span class="nav-label">${n.l}</span></button>`).join('')}
     </nav>
     <div class="sheet-overlay" id="sheetOverlay"><div class="sheet" id="sheetContent"></div></div>`;
-  document.querySelectorAll('.nav-item').forEach(el=>{ el.onclick = ()=>{ if(ui.tab!==el.dataset.tab){ haptic('light'); ui.tab = el.dataset.tab; renderTab(); } }; });
+  document.querySelectorAll('.nav-item').forEach(el=>{ el.onclick = ()=>{
+    const to = el.dataset.tab;
+    if(ui.tab===to) return;
+    haptic('light');
+    const ord = NAV.map(n=>n.t);
+    const dir = ord.indexOf(to) > ord.indexOf(ui.tab) ? 1 : -1; /* тап по панели едет в ту же сторону, что и свайп */
+    ui.tab = to; renderTab(dir);
+  }; });
   document.getElementById('sheetOverlay').onclick = (e)=>{ if(e.target.id==='sheetOverlay') closeSheet(); };
   renderTab();
 
-  /* Pull-to-refresh — iOS-ощущение "spring" без перезагрузки */
   const mc = document.getElementById('mainContent');
 
-  /* Свайп влево/вправо по экрану — переключение разделов.
-     Не трогаем: свайп-удаление продуктов, поля ввода, горизонтальные ленты */
-  const ts = { x:0, y:0, dx:0, mode:null, skip:false };
+  /* ---- Свайпы между разделами: жест 1:1 за пальцем + пружинное завершение (iOS-ощущение).
+     Следующий раздел рисуется сразу и едет за пальцем, как в родных приложениях Apple.
+     Не трогаем: свайп-удаление продуктов, поля ввода, горизонтальные ленты и колёса */
+  const ORDER = NAV.map(n=>n.t);
+  const EASE_IOS = 'cubic-bezier(.32,.72,0,1)';
+  const G = { mode:null, skip:false, x:0, y:0, dx:0, v:0, lastX:0, lastT:0, w:1, dir:0, edge:false, ghost:null };
+
+  function ghostFor(tabKey){
+    const r = mc.getBoundingClientRect();
+    const wrap = document.createElement('div');
+    wrap.className = 'swipe-ghost';
+    wrap.style.cssText = 'position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px;overflow:hidden;pointer-events:none;z-index:35;background:var(--bg);will-change:transform;contain:paint;';
+    let html = '';
+    try{ html = (TABS[tabKey]||TABS.home).html(); }catch(e){ html = ''; }
+    /* у копии убираем id и задержки анимаций: она только для глаз */
+    const inner = document.createElement('div');
+    inner.style.cssText = 'position:absolute;left:0;right:0;top:0;bottom:0;overflow:hidden;';
+    inner.innerHTML = html.replace(/\sid="[^"]*"/g, '').replace(/class="([^"]*)rise([^"]*)"/g, 'class="$1$2"');
+    wrap.appendChild(inner);
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+  function setPos(dx){
+    const off = G.dir===1 ? G.w : -G.w;
+    mc.style.transform = 'translate3d(' + dx + 'px,0,0)';
+    mc.style.opacity = String(Math.max(0.45, 1 - Math.abs(dx)/(G.w*1.5)));
+    if(G.ghost) G.ghost.style.transform = 'translate3d(' + (off + dx) + 'px,0,0)';
+  }
+  function finishSwipe(commit){
+    const off = G.dir===1 ? G.w : -G.w;
+    const ghost = G.ghost, dir = G.dir;
+    const dur = commit ? 360 : 420;
+    window._swipeBusy = true;
+    mc.style.transition = 'transform ' + dur + 'ms ' + EASE_IOS + ', opacity ' + dur + 'ms ' + EASE_IOS;
+    if(ghost) ghost.style.transition = 'transform ' + dur + 'ms ' + EASE_IOS;
+    requestAnimationFrame(()=>{
+      mc.style.transform = 'translate3d(' + (commit ? -off : 0) + 'px,0,0)';
+      mc.style.opacity = commit ? '0.55' : '1';
+      if(ghost) ghost.style.transform = 'translate3d(' + (commit ? 0 : off) + 'px,0,0)';
+    });
+    if(commit) haptic('light');
+    G.ghost = null; G.mode = null; G.dx = 0; G.v = 0;
+    setTimeout(()=>{
+      mc.style.transition = 'none';
+      mc.style.transform = ''; mc.style.opacity = ''; mc.style.willChange = '';
+      if(commit){
+        const j = ORDER.indexOf(ui.tab) + dir;
+        if(j>=0 && j<ORDER.length){ ui.tab = ORDER[j]; renderTab(dir, true); mc.scrollTop = 0; }
+      }
+      requestAnimationFrame(()=>{
+        if(ghost) ghost.remove();
+        window._swipeBusy = false;
+        setTimeout(()=>{ mc.style.transition = ''; }, 30);
+      });
+    }, dur + 10);
+  }
+
   mc.addEventListener('touchstart', e=>{
-    ts.mode = null; ts.dx = 0; ts.skip = false;
-    ts.x = e.touches[0].clientX; ts.y = e.touches[0].clientY;
+    G.mode = null; G.dx = 0; G.v = 0; G.skip = window._swipeBusy || e.touches.length>1;
+    const t = e.touches[0];
+    G.x = t.clientX; G.y = t.clientY; G.lastX = t.clientX; G.lastT = Date.now();
+    G.w = mc.clientWidth || window.innerWidth || 1;
     let el = e.target;
     while(el && el!==mc){
-      if(el.classList && el.classList.contains('swipe-row')){ ts.skip = true; break; }
-      if(el.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)){ ts.skip = true; break; }
-      if(el.scrollWidth > el.clientWidth + 2){ ts.skip = true; break; }
+      if(el.classList && (el.classList.contains('swipe-row') || el.classList.contains('wheel'))){ G.skip = true; break; }
+      if(el.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)){ G.skip = true; break; }
+      if(el.scrollWidth > el.clientWidth + 2){ G.skip = true; break; }
       el = el.parentElement;
     }
   }, {passive:true});
-  mc.addEventListener('touchmove', e=>{
-    if(ts.skip) return;
-    const dx = e.touches[0].clientX - ts.x, dy = e.touches[0].clientY - ts.y;
-    if(ts.mode===null && (Math.abs(dx)>10 || Math.abs(dy)>10)) ts.mode = Math.abs(dx) > Math.abs(dy)*1.2 ? 'h' : 'v';
-    if(ts.mode!=='h') return;
-    ts.dx = dx;
-    mc.style.transition = 'none';
-    mc.style.transform = `translateX(${dx*0.35}px)`;
-    mc.style.opacity = String(Math.max(0.55, 1 - Math.abs(dx)/600));
-  }, {passive:true});
-  mc.addEventListener('touchend', ()=>{
-    if(ts.skip || ts.mode!=='h'){ ts.mode = null; return; }
-    const dir = ts.dx < 0 ? 1 : -1;
-    const order = NAV.map(n=>n.t);
-    const i = order.indexOf(ui.tab), j = i + dir;
-    if(Math.abs(ts.dx) > 70 && j>=0 && j<order.length){
-      mc.style.transition = 'transform .16s ease-in, opacity .16s ease-in';
-      mc.style.transform = `translateX(${dir*-70}px)`;
-      mc.style.opacity = '0';
-      setTimeout(()=>{
-        ui.tab = order[j];
-        haptic('light');
-        mc.style.transition = 'none';
-        mc.style.transform = ''; mc.style.opacity = '';
-        renderTab(dir);
-        setTimeout(()=>{ mc.style.transition = ''; }, 50);
-      }, 165);
-    } else {
-      mc.style.transition = 'transform .35s var(--spring), opacity .25s ease';
-      mc.style.transform = ''; mc.style.opacity = '';
-      setTimeout(()=>{ mc.style.transition = ''; }, 400);
-    }
-    ts.mode = null; ts.dx = 0;
-  }, {passive:true});
 
-  let ptr = { startY:0, pulling:false };
-  mc.addEventListener('touchstart', e=>{ if(mc.scrollTop===0) ptr.startY = e.touches[0].clientY; }, {passive:true});
   mc.addEventListener('touchmove', e=>{
-    if(!ptr.startY) return;
+    if(G.skip || window._swipeBusy) return;
+    const t = e.touches[0];
+    const dx = t.clientX - G.x, dy = t.clientY - G.y;
+    if(G.mode===null){
+      if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      G.mode = Math.abs(dx) > Math.abs(dy)*1.15 ? 'h' : 'v';
+      if(G.mode==='h'){
+        G.dir = dx < 0 ? 1 : -1;
+        const j = ORDER.indexOf(ui.tab) + G.dir;
+        G.edge = !(j>=0 && j<ORDER.length);
+        mc.style.transition = 'none';
+        mc.style.willChange = 'transform, opacity';
+        if(!G.edge){ G.ghost = ghostFor(ORDER[j]); G.ghost.style.transition = 'none'; G.ghost.style.transform = 'translate3d(' + (G.dir===1?G.w:-G.w) + 'px,0,0)'; }
+      }
+    }
+    if(G.mode!=='h') return;
+    if(e.cancelable) e.preventDefault();
+    /* на крайних разделах — мягкая «резинка», как в iOS */
+    G.dx = G.edge ? Math.sign(dx) * Math.pow(Math.abs(dx), 0.72) * 1.6 : dx;
+    const now = Date.now();
+    if(now - G.lastT > 10){ G.v = (t.clientX - G.lastX)/(now - G.lastT); G.lastX = t.clientX; G.lastT = now; }
+    setPos(G.dx);
+  }, {passive:false});
+
+  const endSwipe = ()=>{
+    if(G.mode!=='h'){ G.mode = null; return; }
+    const far = Math.abs(G.dx) > G.w*0.26;
+    const flick = Math.abs(G.v) > 0.4 && Math.abs(G.dx) > 24 && (G.v < 0) === (G.dir === 1);
+    finishSwipe(!G.edge && (far || flick));
+  };
+  mc.addEventListener('touchend', endSwipe, {passive:true});
+  mc.addEventListener('touchcancel', ()=>{ if(G.mode==='h') finishSwipe(false); }, {passive:true});
+
+  /* Pull-to-refresh — пружинное сопротивление без перезагрузки + тянем свежие данные аккаунта */
+  let ptr = { startY:0, pulling:false };
+  mc.addEventListener('touchstart', e=>{ ptr.startY = mc.scrollTop===0 ? e.touches[0].clientY : 0; ptr.pulling = false; }, {passive:true});
+  mc.addEventListener('touchmove', e=>{
+    if(!ptr.startY || G.mode==='h' || window._swipeBusy) return;
     const dy = e.touches[0].clientY - ptr.startY;
-    if(dy > 8 && mc.scrollTop===0 && ts.mode!=='h'){
+    if(dy > 8 && mc.scrollTop===0){
       ptr.pulling = true;
-      const pull = Math.min(dy*0.35, 60);
-      mc.style.transform = `translateY(${pull}px)`;
+      const pull = 70 * (1 - Math.exp(-dy/140)); /* чем дальше тянешь, тем туже — как в iOS */
       mc.style.transition = 'none';
+      mc.style.transform = 'translate3d(0,' + pull.toFixed(1) + 'px,0)';
     }
   }, {passive:true});
   mc.addEventListener('touchend', ()=>{
-    if(!ptr.pulling){ ptr.startY=0; return; }
+    if(!ptr.pulling){ ptr.startY = 0; return; }
     ptr.pulling = false; ptr.startY = 0;
-    mc.style.transition = 'transform .45s var(--spring)';
+    mc.style.transition = 'transform .5s ' + EASE_IOS;
     mc.style.transform = '';
     haptic('light');
-    setTimeout(()=>{ mc.style.transition=''; mc.style.transform=''; }, 500);
+    if(typeof syncFromCloud==='function') syncFromCloud();
+    setTimeout(()=>{ mc.style.transition = ''; }, 520);
   }, {passive:true});
 }
 
-function renderTab(dir){
+function renderTab(dir, noAnim){
   document.querySelectorAll('.nav-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===ui.tab));
   const bnav = document.getElementById('bottomNav');
   if(bnav) bnav.querySelectorAll('.nav-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===ui.tab));
@@ -1769,8 +2098,10 @@ function renderTab(dir){
   const tab = TABS[ui.tab] || TABS.home;
   c.innerHTML = tab.html();
   c.classList.remove('screen-enter','enter-right','enter-left');
-  void c.offsetWidth;
-  c.classList.add(dir===1 ? 'enter-right' : dir===-1 ? 'enter-left' : 'screen-enter');
+  if(!noAnim){ /* после свайпа анимация не нужна — раздел уже приехал за пальцем */
+    void c.offsetWidth;
+    c.classList.add(dir===1 ? 'enter-right' : dir===-1 ? 'enter-left' : 'screen-enter');
+  }
   if(tab.bind) tab.bind();
 }
 ACTIONS.goTab = (arg)=>{ ui.tab = arg; renderTab(); };
@@ -2981,15 +3312,30 @@ function renderSettingsTab(){
   else if(ui.settingsTab==='goal'){
     const rk = x=>Math.round(tdee(p)*x/10)*10;
     const goals = [ ['maintain','Поддерживать вес',rk(1)], ['slow','Худеть медленно',rk(0.90)], ['moderate','Худеть умеренно',rk(0.80)], ['fast','Худеть быстро',rk(0.72)] ];
+    const man = customOn(p);
+    const c = p.custom || {};
+    const mt = macroTargets(p);
+    const cK = Math.round(c.kcal || goalCalories(p)), cP = Math.round(c.p>0?c.p:mt.protein), cF = Math.round(c.f>0?c.f:mt.fat), cC = Math.round(c.c>0?c.c:mt.carbs);
     body = `
-      <div class="goal-banner"><div class="goal-banner-num">${goalCalories(p)}</div><div class="goal-banner-lbl">ккал — твоя дневная норма</div></div>
-      <div class="goal-list">
+      <div class="goal-banner"><div class="goal-banner-num">${goalCalories(p)}</div><div class="goal-banner-lbl">ккал — твоя дневная норма${man?' · задана вручную':''}</div></div>
+      <div class="card">
+        <div class="theme-toggle-row" data-act="toggleCustomKbju"><div>Свои КБЖУ</div><div class="switch ${man?'on':''}"><div class="knob"></div></div></div>
+        <div class="settings-hint" style="margin:6px 2px ${man?'14px':'0'}">Задать норму на день самому вместо расчёта по формуле</div>
+        ${man?`
+        <div class="field-row"><div class="field-row-lbl">Калории, ккал</div><input class="field-row-input" id="cKcal" type="number" inputmode="numeric" value="${cK}"></div>
+        <div class="field-row"><div class="field-row-lbl">Белки, г</div><input class="field-row-input" id="cP" type="number" inputmode="numeric" value="${cP}"></div>
+        <div class="field-row"><div class="field-row-lbl">Жиры, г</div><input class="field-row-input" id="cF" type="number" inputmode="numeric" value="${cF}"></div>
+        <div class="field-row"><div class="field-row-lbl">Углеводы, г</div><input class="field-row-input" id="cC" type="number" inputmode="numeric" value="${cC}"></div>
+        <div class="settings-hint" style="margin:10px 2px 0">По БЖУ выходит ${Math.round(cP*4 + cC*4 + cF*9)} ккал. Кольцо, остаток на день, календарь, аналитика, графики, прогноз и советы считаются от этих цифр</div>
+        <button class="data-btn" style="margin-top:12px" data-act="fillKbjuFromFormula">Подставить расчёт по формуле<span class="data-btn-sub">по твоему весу, активности и цели</span></button>`:''}
+      </div>
+      <div class="goal-list" style="margin-top:14px${man?';opacity:.5':''}">
         ${goals.map(([k,l,kc])=>`<div class="goal-card pressable ${p.goal===k?'active':''}" data-act="setGoal" data-arg="${k}"><div class="goal-left"><div class="goal-radio"></div><div class="goal-name">${l}</div></div><div class="goal-kcal">${Math.round(kc)}</div></div>`).join('')}
       </div>
       <div class="card" style="margin-top:14px">
         <div class="field-row"><div class="field-row-lbl">Целевой вес, кг</div><input class="field-row-input" id="sTarget" type="number" inputmode="decimal" value="${p.targetWeight}"></div>
       </div>
-      <div class="settings-hint">Дневная норма калорий автоматически пересчитывается при любом изменении</div>`;
+      <div class="settings-hint">${man?'Норма зафиксирована вручную — формула её не перезапишет. Цель выше влияет только на прогноз темпа':'Дневная норма калорий автоматически пересчитывается при любом изменении'}</div>`;
   }
   else if(ui.settingsTab==='look'){
     body = `
@@ -3037,6 +3383,12 @@ function bindSettings(){
     }
   });
   num('sTarget', v=>{ if(v>=30 && v<=300){ S.profile.targetWeight = r1(v); checkGoalReached(); } });
+  /* ручные КБЖУ */
+  const setC = (patch)=>{ S.profile.custom = Object.assign({on:true}, S.profile.custom||{}, patch); };
+  num('cKcal', v=>{ setC({ kcal: Math.max(600, Math.min(8000, Math.round(v))) }); });
+  num('cP', v=>{ setC({ p: Math.max(0, Math.min(600, Math.round(v))) }); });
+  num('cF', v=>{ setC({ f: Math.max(0, Math.min(400, Math.round(v))) }); });
+  num('cC', v=>{ setC({ c: Math.max(0, Math.min(900, Math.round(v))) }); });
 }
 TABS.settings = { html: renderSettingsTab, bind: bindSettings };
 ACTIONS.settingsTab = (arg)=>{ ui.settingsTab = arg; renderTab(); };
@@ -3052,6 +3404,23 @@ ACTIONS.infoActivity = ()=> openModal(`
     Коэффициент умножается на базовый обмен по формуле Миффлина-Сан Жеора — так считается твоя дневная норма. Норма пересчитывается сразу после выбора. Выбирай честно: завышенный уровень замедлит сушку</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
 ACTIONS.setGoal = (arg)=>{ S.profile.goal = arg; save(); renderTab(); };
+ACTIONS.toggleCustomKbju = ()=>{
+  const p = S.profile, cur = p.custom || {};
+  if(cur.on){ p.custom = Object.assign({}, cur, {on:false}); showToast('Норма снова считается по формуле'); }
+  else{
+    const auto = autoMacroTargets(p);
+    p.custom = { on:true, kcal: cur.kcal || goalCalories(p), p: cur.p || auto.protein, f: cur.f || auto.fat, c: cur.c || auto.carbs };
+    showToast('Ручные КБЖУ включены — все расчёты идут от твоих цифр');
+  }
+  save(); renderTab();
+};
+ACTIONS.fillKbjuFromFormula = ()=>{
+  const p = S.profile, keep = p.custom;
+  p.custom = null; /* на мгновение считаем чистой формулой */
+  const kcal = goalCalories(p), auto = autoMacroTargets(p);
+  p.custom = { on:true, kcal, p:auto.protein, f:auto.fat, c:auto.carbs };
+  save(); renderTab(); showToast('Подставлен расчёт по формуле: ' + kcal + ' ккал');
+};
 ACTIONS.toggleDark = ()=>{ S.theme.dark = !isDark(); save(); applyTheme(); renderTab(); };
 ACTIONS.setAccent = (arg)=>{ S.theme.accent = arg; save(); applyTheme(); renderTab(); };
 
@@ -3188,6 +3557,8 @@ ACTIONS.applyRestore = ()=>{
     const data = JSON.parse(document.getElementById('restText').value);
     if(!data || typeof data!=='object' || !data.profile) throw new Error('bad');
     S = Object.assign({ foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false }, data);
+    S.uid = TG_UID || ''; S.stamps = {}; S.tomb = {};
+    _snap = null; /* всё содержимое копии получит свежие метки и разойдётся на все устройства */
     save(true); applyTheme(); closeSheet(); haptic('ok');
     showToast('Данные восстановлены');
     ui.tab = 'home'; renderMain();
@@ -3201,10 +3572,11 @@ ACTIONS.resetAll = ()=>{
     <button class="btn-secondary" style="margin-top:8px" data-act="closeModal">Отмена</button>`);
 };
 ACTIONS.confirmReset = async ()=>{
-  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false };
-  try{ localStorage.removeItem('charge_v2'); }catch(e){}
+  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'' };
+  _snap = null;
+  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem('charge_v2'); }catch(e){}
   if(cloudOK){
-    const keys = ['cs_meta','cs2_meta','cs_profile'];
+    const keys = ['cs_meta','cs2_meta','cs2_meta_prev','cs_profile'];
     for(let i=0;i<CS_MAX;i++){ keys.push('cs_'+i); keys.push('csA_'+i); keys.push('csB_'+i); }
     for(let i=0;i<keys.length;i+=50) await csRemoveItems(keys.slice(i,i+50));
     _cloudHadProfile = false; _lastProfileJson = '';
