@@ -1344,12 +1344,30 @@ const FOOD_DB = [
   {name:'Хумус', emoji:'🧆', per100:{kcal:240,p:8,c:14,f:17,na:380,k:230}},
   {name:'Тофу', emoji:'🧈', per100:{kcal:76,p:8,c:1.9,f:4.8,na:7,k:120}},
   /* крупы, гарниры */
+  /* --- сухие крупы, макароны и бобовые (значения на 100 г сухого продукта) --- */
+  {name:'Гречка (сухая крупа)', emoji:'🌾', per100:{kcal:343,p:13,c:72,f:3.4,na:4,k:380}},
+  {name:'Рис белый (сухой)', emoji:'🌾', per100:{kcal:365,p:7.1,c:80,f:0.7,na:1,k:115}},
+  {name:'Рис бурый (сухой)', emoji:'🌾', per100:{kcal:370,p:7.9,c:77,f:2.9,na:7,k:268}},
+  {name:'Овсянка (крупа, сухая)', emoji:'🌾', per100:{kcal:352,p:12,c:62,f:6.2,na:3,k:330}},
+  {name:'Пшено (сухое)', emoji:'🌾', per100:{kcal:348,p:11,c:69,f:3.3,na:5,k:211}},
+  {name:'Перловка (сухая)', emoji:'🌾', per100:{kcal:352,p:9.9,c:74,f:1.2,na:10,k:280}},
+  {name:'Ячневая крупа (сухая)', emoji:'🌾', per100:{kcal:324,p:10,c:66,f:1.3,na:15,k:205}},
+  {name:'Манная крупа (сухая)', emoji:'🌾', per100:{kcal:333,p:10,c:70,f:1,na:3,k:130}},
+  {name:'Кукурузная крупа (сухая)', emoji:'🌽', per100:{kcal:328,p:8.3,c:71,f:1.2,na:7,k:147}},
+  {name:'Булгур (сухой)', emoji:'🌾', per100:{kcal:342,p:12,c:76,f:1.3,na:17,k:410}},
+  {name:'Кускус (сухой)', emoji:'🌾', per100:{kcal:376,p:13,c:77,f:0.6,na:10,k:166}},
+  {name:'Киноа (сухая)', emoji:'🌾', per100:{kcal:368,p:14,c:64,f:6,na:5,k:563}},
+  {name:'Макароны (сухие)', emoji:'🍝', per100:{kcal:371,p:13,c:75,f:1.5,na:6,k:223}},
+  {name:'Чечевица (сухая)', emoji:'🫘', per100:{kcal:353,p:25,c:60,f:1.1,na:6,k:677}},
+  {name:'Нут (сухой)', emoji:'🫘', per100:{kcal:364,p:19,c:61,f:6,na:24,k:718}},
+  {name:'Фасоль (сухая)', emoji:'🫘', per100:{kcal:333,p:21,c:60,f:1.2,na:12,k:1406}},
+  {name:'Горох (сухой)', emoji:'🫛', per100:{kcal:340,p:23,c:60,f:1.2,na:15,k:873}},
   {name:'Макароны отварные', emoji:'🍝', per100:{kcal:112,p:3.5,c:23,f:0.4,na:1,k:24}},
   {name:'Макароны по-флотски', emoji:'🍝', per100:{kcal:180,p:9,c:20,f:7,na:350,k:180}},
   {name:'Овсянка на молоке', emoji:'🥣', per100:{kcal:102,p:3.7,c:14,f:3.1,na:35,k:110}},
   {name:'Овсяные хлопья (сухие)', emoji:'🌾', per100:{kcal:352,p:12,c:62,f:6.2,na:3,k:330}},
   {name:'Кукурузная каша', emoji:'🌽', per100:{kcal:90,p:2.1,c:19,f:0.5,na:5,k:60}},
-  {name:'Ячневая каша', emoji:'🥣', per100:{kcal:96,p:3.5,c:18,f:1.1,na:5,k:80}},
+  {name:'Ячневая ка��а', emoji:'🥣', per100:{kcal:96,p:3.5,c:18,f:1.1,na:5,k:80}},
   {name:'Картофель жареный', emoji:'🍟', per100:{kcal:192,p:2.8,c:23,f:9.5,na:15,k:460}},
   {name:'Драники', emoji:'🥔', per100:{kcal:200,p:4,c:23,f:10,na:320,k:400}},
   /* овощи */
@@ -1529,9 +1547,8 @@ async function publishFood(food){
 
 /* ================= Калории и расчёты ================= */
 /* базовый обмен — формула Миффлина-Сан Жеора */
-function bmr(p){ return p.gender==='male'
-  ? 88.36 + 13.4*p.weight + 4.8*p.height - 5.7*p.age
-  : 447.6 + 9.2*p.weight + 3.1*p.height - 4.3*p.age; }
+function bmr(p){ const base = 10*p.weight + 6.25*p.height - 5*p.age;
+  return p.gender==='male' ? base + 5 : base - 161; }
 const ACTIVITY_MULT = { min:1.2, low:1.375, medium:1.55, high:1.725, athlete:1.9 };
 function tdee(p){ return bmr(p) * (ACTIVITY_MULT[p.activity] || 1.375); }
 /* дефицит в процентах от нормы */
@@ -1580,8 +1597,15 @@ function macroTargets(p){
 function dayItems(ds){ return S.foodLog[ds] || []; }
 function dayTotal(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.kcal||0),0)); }
 function dayMacro(ds,key){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i[key]||0),0)); }
-function dayNa(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.na!=null?i.na:(i.kcal||0)*0.9),0)); }
-function dayK(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.k!=null?i.k:(i.kcal||0)*1.2),0)); }
+/* натрий/калий считаем ТОЛЬКО по продуктам с реальными данными — выдумывать нельзя */
+function naItems(ds){ return dayItems(ds).filter(i=>i.na!=null); }
+function kItems(ds){ return dayItems(ds).filter(i=>i.k!=null); }
+function dayNa(ds){ return Math.round(naItems(ds).reduce((s,i)=>s+i.na,0)); }
+function dayK(ds){ return Math.round(kItems(ds).reduce((s,i)=>s+i.k,0)); }
+/* покрытие данными: none — ни у одного продукта нет na/k; partial — есть не у всех; full — есть у всех */
+function nkCoverage(ds){ const items=dayItems(ds); if(!items.length) return 'none';
+  const withData=items.filter(i=>i.na!=null||i.k!=null); if(!withData.length) return 'none';
+  return withData.length<items.length ? 'partial' : 'full'; }
 function daySalt(ds){ return r1(dayNa(ds)*2.5/1000); }
 const SALT_LIMIT = 4.5;
 function dayWater(ds){ return S.waterLog[ds] || 0; }
@@ -1597,8 +1621,8 @@ function activityRating(ds){
   if(score>=0.45) return {label:'Умеренная', color:'#ffc247'};
   return {label:'Слабая', color:'#ff8a80'};
 }
-function dayDeficit(ds){ /* истинный дефицит: съедено − (базовый расход + активность), отрицательное = дефицит */ return dayTotal(ds) - Math.round(tdee(S.profile)) - dayBurned(ds); }
-function dayGoalDelta(ds){ /* отклонение от дневной цели: 0 = точно по плану */ return dayTotal(ds) - goalCalories(S.profile) - dayBurned(ds); }
+function dayDeficit(ds){ /* истинный дефицит: съедено − расход. Активность уже заложена в коэффициент TDEE, поэтому dayBurned повторно не вычитаем. Отрицательное = дефицит */ return dayTotal(ds) - Math.round(tdee(S.profile)); }
+function dayGoalDelta(ds){ /* отклонение от дневной цели: 0 = точно по плану. Активность уже учтена в норме через TDEE */ return dayTotal(ds) - goalCalories(S.profile); }
 
 /* ---- стрик с заморозками (3 в месяц) ---- */
 function streakInfo(){
@@ -1753,7 +1777,7 @@ async function init(){
   }catch(e){}
   S.stamps = S.stamps || {}; S.tomb = S.tomb || {};
   S.uid = TG_UID || S.uid || '';
-  _snap = snapshot(S); /* базовая точка: дальше каждая правка получает свою метку времени */
+  _snap = snapshot(S); /* базовая точка: даль��е каждая правка получает свою метку времени */
   if(!S.profile && params.get('demo')==='1') seedDemo();
   /* миграция старых уровней активности на новую шкалу */
   if(S.profile && !S.profile.actV2){ const remap = {low:'min', medium:'low', high:'medium'}; if(remap[S.profile.activity]) S.profile.activity = remap[S.profile.activity]; S.profile.actV2 = 1; save(); }
@@ -2132,8 +2156,8 @@ function renderHome(){
   const warnKey = `warnDismissed_${todayStr()}`;
   const warnDismissed = sessionStorage.getItem(warnKey);
   if(!warnDismissed){
-    if(hasEaten && hour>=18 && (goal - consumed - burned) > 900)
-      warn = `<div class="warn-card red rise" id="warnCard"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Пока что дефицит выходит слишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
+    if(hasEaten && hour>=18 && (goal - consumed) > 900)
+      warn = `<div class="warn-card red rise" id="warnCard"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Пока что дефицит выходит с��ишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
     else if(consumed > goal + 250)
       warn = `<div class="warn-card rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Сегодня ${consumed - goal} ккал сверх нормы. Ничего страшного — просто вернись в ритм завтра</span></div>`;
   }
@@ -2267,17 +2291,20 @@ ACTIONS.closeGoal = ()=>{ const ov = document.getElementById('goalOverlay'); if(
 /* ================= Контроль отёков ================= */
 function edemaHtml(){
   const ds = todayStr();
+  const cov = nkCoverage(ds);
+  const hasNk = cov !== 'none';
   const salt = daySalt(ds);
-  const saltOver = salt > SALT_LIMIT;
+  const saltOver = hasNk && salt > SALT_LIMIT;
   const water = dayWater(ds);
   const norm = waterNormMl();
   const na = dayNa(ds), k = dayK(ds);
   const kNa = na>0 ? k/na : (k>0 ? 99 : 0);
   let ratioState, ratioLabel, ratioNote;
-  if(na===0 && k===0){ ratioState='mid'; ratioLabel='—'; ratioNote='Пока нет данных — добавь еду, и я рассчитаю баланс калия и натрия'; }
+  if(!hasNk){ ratioState='mid'; ratioLabel='—'; ratioNote='Пока нет данных о натрии и калии — добавь продукты из базы, и я рассчитаю баланс'; }
   else if(kNa >= 4){ ratioState='good'; ratioLabel='Идеальный'; ratioNote='Калия в 4–5 раз больше натрия — идеальный баланс, лишняя вода не задерживается'; }
   else if(kNa >= 2){ ratioState='mid'; ratioLabel='В норме'; ratioNote='Калия в 2–3 раза больше натрия — неплохо, но до идеала (4–5 к 1) добавь бананы, авокадо, шпинат, зелень или выпей добавку'; }
   else { ratioState='bad'; ratioLabel='Мало'; ratioNote='Калия слишком мало по отношению к натрию — это задерживает воду. Добавь картофель, бананы, авокадо, шпинат или курагу'; }
+  const covNote = cov==='partial' ? '<div class="metric-note" style="margin-top:6px;opacity:.8">У части продуктов сегодня нет данных о натрии/калии — показаны только те, где данные есть</div>' : '';
   const act = activityRating(ds);
   const wLitre = (water/1000).toFixed(water%1000===0?0:1);
   const nLitre = (norm/1000).toFixed(norm%1000===0?0:1);
@@ -2287,15 +2314,16 @@ function edemaHtml(){
     <div class="metric-card rise">
       <button class="info-dot" data-act="infoSalt">${ic('info')}</button>
       <div class="metric-lbl">Съедено соли:</div>
-      <div class="metric-big ${saltOver?'over':''}"><span class="val">${salt} г</span><span class="limit2"> / ${SALT_LIMIT}</span></div>
-      <div class="metric-bar ${saltOver?'danger':''}"><i style="width:${Math.min(salt/SALT_LIMIT*100,100)}%"></i></div>
+      <div class="metric-big ${saltOver?'over':''}"><span class="val">${hasNk?salt+' г':'нет данных'}</span>${hasNk?`<span class="limit2"> / ${SALT_LIMIT}</span>`:''}</div>
+      <div class="metric-bar ${saltOver?'danger':''}"><i style="width:${hasNk?Math.min(salt/SALT_LIMIT*100,100):0}%"></i></div>
       ${saltOver?'<div class="metric-note" style="color:var(--red)">Избыток соли — возможна задержка воды и отёк утром. Выбирай пресную еду до конца дня</div>':''}
       <div class="nk-grid">
-        <div class="nk-cell"><div class="nk-cell-lbl">Натрий</div><div class="nk-cell-val">${na} мг</div></div>
-        <div class="nk-cell"><div class="nk-cell-lbl">Калий</div><div class="nk-cell-val">${k} мг</div></div>
+        <div class="nk-cell"><div class="nk-cell-lbl">Натрий</div><div class="nk-cell-val">${hasNk?na+' мг':'—'}</div></div>
+        <div class="nk-cell"><div class="nk-cell-lbl">Калий</div><div class="nk-cell-val">${hasNk?k+' мг':'—'}</div></div>
         <div class="nk-cell"><div class="nk-cell-lbl">Баланс</div><div class="nk-cell-val"><span class="nk-ratio-badge ${ratioState}">${ratioLabel}</span></div></div>
       </div>
       <div class="metric-note" style="margin-top:8px">${ratioNote}</div>
+      ${covNote}
     </div>
 
     <div class="metric-card rise" style="animation-delay:.06s">
@@ -2367,7 +2395,7 @@ ACTIONS.infoSalt = ()=> openModal(`
   <div class="modal-title">Соль и отёки</div>
   <div class="modal-text">Чтобы не допускать задержку жидкости, ешь не более 4.5 г соли в день</div>
   <div class="modal-text">Не добавляй соль в еду, <b>сократи</b> или <b>исключи</b> хлеб, чипсы, соусы, полуфабрикаты, сыр, фастфуд, колбасы, сосиски и подобное</div>
-  <div class="modal-text">Идеальное соотношение калия к натрию – 4-5 к 1 (в пользу калия). <b>Источники калия:</b> бананы, авокадо, шпинат, картофель, бобовые, курага, орехи</div>
+  <div class="modal-text">Идеальное соотношение калия к натрию – 4-5 к 1 (в пользу калия). <b>Источни��и калия:</b> бананы, авокадо, шпинат, картофель, бобовые, курага, орехи</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
 ACTIONS.infoWater = ()=> openModal(`
   <div class="modal-title">Вода</div>
@@ -2997,7 +3025,7 @@ function addPickedToLog(grams){
   save(true); haptic('ok');
   /* меню продуктов остаётся открытым — можно сразу добавить следующий */
   openSheet(addFoodHtml()); renderFoodTabBody();
-  showToast(`Добавлено: ${item.name} · ${item.kcal} ккал`);
+  showToast(`Добав��ено: ${item.name} · ${item.kcal} ккал`);
   renderTab();
 }
 
@@ -3401,7 +3429,7 @@ ACTIONS.infoActivity = ()=> openModal(`
     <b>Слабый</b> — лёгкая активность: прогулки, 1–3 тренировки в неделю (×1.375)<br><br>
     <b>Умеренный</b> — тренировки 3–5 раз в неделю, много движения днём (×1.55)<br><br>
     <b>Высокий</b> — интенсивные тренировки 6–7 раз в неделю или физическая работа (×1.725)<br><br>
-    Коэффициент умножается на базовый обмен по формуле Миффлина-Сан Жеора — так считается твоя дневная норма. Норма пересчитывается сразу после выбора. Выбирай честно: завышенный уровень замедлит сушку</div>
+    Коэффициент умножается на базовый обмен по формуле Миффлина-Сан Жеора — так считается твоя дневная норма. Норма пересчитывается сразу после выбора. Выбирай честно: завышенный уровень замедлит су��ку</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
 ACTIONS.setGoal = (arg)=>{ S.profile.goal = arg; save(); renderTab(); };
 ACTIONS.toggleCustomKbju = ()=>{
@@ -3453,7 +3481,7 @@ ACTIONS.buildImportRows = ()=>{
     const ds = todayStr(new Date(Date.now()-i*86400000));
     rows += `
       <div class="import-day" data-date="${ds}">
-        <div class="import-day-title">${fmtDateShort(ds)}${i===1?' · вчера':''}</div>
+        <div class="import-day-title">${fmtDateShort(ds)}${i===1?' · вче��а':''}</div>
         <div class="import-row2">
           <input class="plain-input imp-kcal" type="number" inputmode="numeric" placeholder="ккал*">
           <input class="plain-input imp-w" type="text" inputmode="decimal" placeholder="вес">
@@ -3516,7 +3544,7 @@ function applyImport(days){
   days.forEach(d=>{
     if(!(S.foodLog[d.date]||[]).length){
       S.foodLog[d.date] = [{ name:'Импорт истории', emoji:'📥', time:'12:00', kcal:d.kcal,
-        p:d.p, c:d.c, f:d.f, na:Math.round(d.kcal*0.9), k:Math.round(d.kcal*1.2), imported:true }];
+        p:d.p, c:d.c, f:d.f, imported:true }]; // na/k не выдумываем — у истории импорта их нет
       added++;
     }
     if(d.weight) upsertWeight(d.date, d.weight);
