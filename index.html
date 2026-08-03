@@ -698,7 +698,7 @@ function csRemoveItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.rem
 function clone(x){ try{ return x==null? x : JSON.parse(JSON.stringify(x)); }catch(e){ return x; } }
 function newId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
-/* ---------- слияние состояний (коммутативно: результат не зависит от порядка) ---------- */
+/* ---------- слияние состояний (коммутативно: результат н�� зависит от порядка) ---------- */
 function itemKey(it){ return it && (it.id || ((it.time||'') + '|' + (it.name||it.label||'') + '|' + (it.kcal||0))); }
 function mergeItemLogs(a, b, tomb){
   const out = {};
@@ -903,7 +903,11 @@ function snapshot(st){
 function stampItemLog(logName, prev, t){
   const log = S[logName] || {};
   const prevIds = new Set();
-  Object.keys(prev||{}).forEach(d=> (prev[d]||[]).forEach(it=>{ const k = itemKey(it); if(k) prevIds.add(k); }));
+  /* «Надгробия» ставим ТОЛЬКО для записей с уже существующим стабильным id.
+     Раньше сюда попадали составные ключи старых записей (без id): при миграции
+     записи получали новые id, старые ключи считались удалёнными — и те же самые
+     записи стирались на другом устройстве при слиянии */
+  Object.keys(prev||{}).forEach(d=> (prev[d]||[]).forEach(it=>{ if(it && it.id) prevIds.add(it.id); }));
   const prevById = {};
   Object.keys(prev||{}).forEach(d=> (prev[d]||[]).forEach(it=>{ const k = itemKey(it); if(k) prevById[k] = it; }));
   const nowIds = new Set();
@@ -966,7 +970,7 @@ function pruneHistory(){
     const lastW = sorted[sorted.length-1];
     S.weightLog = S.weightLog.filter(w=> w.date>=cut || w===lastW);
   }
-  delete S.accessCache; /* это лишь кэш ответа о доступе — не храним в раздутом состоянии */
+  delete S.accessCache; /* легаси: раньше кэш доступа лежал в состоянии — вычищаем */
   const keys = Object.keys(S.foodFreq||{});
   if(keys.length>250){
     keys.sort((a,b)=> String(S.foodFreq[b].last||'').localeCompare(String(S.foodFreq[a].last||'')));
@@ -1010,7 +1014,6 @@ async function doSave(){
     _snap = snapshot(S);
     /* 2) пишем в НЕАКТИВНУЮ генерацию и переключаем мету только после успеха всех
           кусков — прошлая целая копия всегда остаётся как резерв */
-    const prevMeta = _csGen ? null : null;
     const gen = _csGen==='A' ? 'B' : 'A';
     const n = Math.max(1, Math.ceil(json.length/CS_CHUNK));
     let ok = n<=CS_MAX;
@@ -1087,7 +1090,9 @@ async function syncFromCloud(){
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') syncFromCloud(); });
 window.addEventListener('focus', ()=>syncFromCloud());
 window.addEventListener('online', ()=>syncFromCloud());
-setInterval(()=>{ if(document.visibilityState==='visible') syncFromCloud(); }, 7000);
+/* 7 секунд было слишком агрессивно: каждый тик — чтение десятков ключей
+   CloudStorage, и Telegram начинал резать запросы по рейт-лимиту */
+setInterval(()=>{ if(document.visibilityState==='visible') syncFromCloud(); }, 20000);
 
 /* ================= Состояние ================= */
 let S = {
@@ -1100,7 +1105,6 @@ let S = {
   stepsLog:{},         // {'YYYY-MM-DD': steps}
   workoutLog:{},       // {'YYYY-MM-DD':[{kind,label,mins,detail,kcal,time}]}
   theme:{dark:null,accent:'orange'},
-        // {pct,waist,neck,chest,hip,date}
   goalShown:false,
   stamps:{},           // метки времени правок — нужны для слияния между устройствами
   tomb:{},             // id удалённых записей — чтобы удалённое не возвращалось
@@ -1113,7 +1117,12 @@ let ui = { tab:'home', settingsTab:'profile' };
    Telegram initData и членство в канале через Bot API. Обойти через клиент нельзя.
    Пока ACCESS_FN_URL пуст — проверка выключена и приложение работает как раньше. */
 const ACCESS_FN_URL = 'https://clolqywsqbggnkyikjaq.supabase.co/functions/v1/check-access'; /* ВСТАВЬ: https://<project-ref>.supabase.co/functions/v1/check-access */
-const ACCESS_LINK = ''; /* ссылка на ПОКУПКУ доступа (бот оплаты/менеджер) — НИКОГДА не инвайт в канал! */  /* ВСТАВЬ: ссылка-приглашение в закрытый канал, напр. https://t.me/+AbCdEf123 */
+const ACCESS_LINK = ''; /* ВСТАВЬ ссылку на ПОКУПКУ доступа (бот оплаты/менеджер), а не инвайт в закрытый канал */
+/* кэш ответа о доступе живёт �� localStorage устройства, а НЕ в синхронизируемом
+   состоянии: иначе он раздувал облако и разъезжался между устройствами */
+function accessCacheKey(){ return 'access_cache_' + (TG_UID || 'anon'); }
+function readAccessCache(){ try{ return JSON.parse(localStorage.getItem(accessCacheKey()) || 'null'); }catch(e){ return null; } }
+function writeAccessCache(v){ try{ localStorage.setItem(accessCacheKey(), JSON.stringify({ v:v, at:Date.now() })); }catch(e){} }
 async function checkAccess(){
   if(!ACCESS_FN_URL || !tg || !tg.initData) return {access:'member'};
   try{
@@ -1123,10 +1132,11 @@ async function checkAccess(){
     const r = await fetch(ACCESS_FN_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ initData: tg.initData }), signal: ctl.signal });
     clearTimeout(tid);
     const j = await r.json();
-    if(j && j.access){ S.accessCache = { v:j, at:Date.now() }; save(); return j; }
+    if(j && j.access){ writeAccessCache(j); return j; }
   }catch(e){}
   /* сеть/функция недоступны — не запираем подписчика: 48 часов живём на последнем ответе */
-  if(S.accessCache && Date.now()-S.accessCache.at < 48*3600e3) return S.accessCache.v;
+  const cached = readAccessCache();
+  if(cached && cached.v && Date.now()-cached.at < 48*3600e3) return cached.v;
   return {access:'member'};
 }
 function renderLock(expired){
@@ -1166,7 +1176,7 @@ function r1(x){ return Math.round(x*10)/10; }
 /* ================= База продуктов (работает без интернета) =================
    na/k — натрий/калий, мг на 100 г */
 const FOOD_DB = [
-  /* закреплённая добавка: 1 порция = 1 г порошка ≈ 365 мг чистого калия, 0 ккал */
+  /* закреплённая доб��вка: 1 порция = 1 г порошка ≈ 365 мг чистого калия, 0 ккал */
   {name:'Калий цитрат (1 г)', emoji:'💊', pinned:true, fixed:{kcal:0,p:0,c:0,f:0,na:0,k:365}},
   {name:'Куриная грудка (варёная)', emoji:'🍗', per100:{kcal:165,p:31,c:0,f:3.6,na:64,k:350}},
   {name:'Рис отварной', emoji:'🍚', per100:{kcal:130,p:2.7,c:28,f:0.3,na:5,k:35}},
@@ -1187,7 +1197,7 @@ const FOOD_DB = [
   {name:'Сыр твёрдый', emoji:'🧀', per100:{kcal:350,p:25,c:1.3,f:27,na:700,k:100}},
   {name:'Брокколи на пару', emoji:'🥦', per100:{kcal:35,p:2.4,c:7,f:0.4,na:30,k:300}},
   {name:'Картофель отварной', emoji:'🥔', per100:{kcal:87,p:1.9,c:20,f:0.1,na:4,k:380}},
-  {name:'Говядина (постная)', emoji:'🥩', per100:{kcal:187,p:26,c:0,f:8.6,na:60,k:320}},
+  {name:'Говя��ина (постная)', emoji:'🥩', per100:{kcal:187,p:26,c:0,f:8.6,na:60,k:320}},
   {name:'Салат овощной с маслом', emoji:'🥗', per100:{kcal:95,p:1.5,c:6,f:7,na:200,k:250}},
   {name:'Протеиновый батончик', emoji:'🍫', per100:{kcal:380,p:30,c:35,f:12,na:200,k:250}},
   {name:'Арахисовая паста', emoji:'🥜', per100:{kcal:588,p:25,c:20,f:50,na:400,k:650}},
@@ -1201,7 +1211,7 @@ const FOOD_DB = [
   {name:'Соевый соус', emoji:'🍶', per100:{kcal:53,p:6,c:6.6,f:0,na:5500,k:220}},
   {name:'Кетчуп', emoji:'🫙', per100:{kcal:100,p:1.2,c:24,f:0.1,na:900,k:280}},
   {name:'Майонез', emoji:'🫙', per100:{kcal:680,p:1,c:2.6,f:75,na:635,k:20}},
-  {name:'Пельмени отварные', emoji:'🥟', per100:{kcal:245,p:11,c:26,f:11,na:550,k:180}},
+  {name:'Пель��ени отварные', emoji:'🥟', per100:{kcal:245,p:11,c:26,f:11,na:550,k:180}},
   /* мясо и птица */
   {name:'Индейка (филе)', emoji:'🍗', per100:{kcal:114,p:24,c:0,f:1.7,na:63,k:300}},
   {name:'Куриное бедро без кожи', emoji:'🍗', per100:{kcal:185,p:24,c:0,f:9.5,na:86,k:240}},
@@ -1232,7 +1242,7 @@ const FOOD_DB = [
   {name:'Омлет из 2 яиц', emoji:'🍳', per100:{kcal:185,p:12,c:2,f:14,na:400,k:130}},
   {name:'Яичница', emoji:'🍳', per100:{kcal:196,p:13,c:1,f:15,na:300,k:130}},
   {name:'Творог 0%', emoji:'🧀', per100:{kcal:71,p:16,c:1.8,f:0.2,na:44,k:117}},
-  {name:'Творог 9%', emoji:'🧀', per100:{kcal:159,p:16,c:2,f:9,na:41,k:112}},
+  {name:'Творог 9%', emoji:'��', per100:{kcal:159,p:16,c:2,f:9,na:41,k:112}},
   {name:'Сырники', emoji:'🥞', per100:{kcal:220,p:15,c:18,f:10,na:250,k:150}},
   {name:'Сметана 15%', emoji:'🥛', per100:{kcal:158,p:2.6,c:3,f:15,na:40,k:116}},
   {name:'Кефир 1%', emoji:'🥛', per100:{kcal:40,p:3,c:4,f:1,na:50,k:150}},
@@ -1249,7 +1259,7 @@ const FOOD_DB = [
   {name:'Киноа отварная', emoji:'🍚', per100:{kcal:120,p:4.4,c:21,f:1.9,na:7,k:172}},
   {name:'Перловка отварная', emoji:'🍚', per100:{kcal:109,p:3.1,c:22,f:0.4,na:3,k:75}},
   {name:'Пшённая каша', emoji:'🍚', per100:{kcal:90,p:3,c:17,f:0.8,na:4,k:80}},
-  {name:'Кускус отварной', emoji:'🍚', per100:{kcal:112,p:3.8,c:23,f:0.2,na:5,k:58}},
+  {name:'Кускус от��арно����', emoji:'🍚', per100:{kcal:112,p:3.8,c:23,f:0.2,na:5,k:58}},
   {name:'Рис бурый отварной', emoji:'🍚', per100:{kcal:110,p:2.6,c:23,f:0.9,na:5,k:43}},
   {name:'Чечевица отварная', emoji:'🫘', per100:{kcal:116,p:9,c:20,f:0.4,na:2,k:370}},
   {name:'Нут отварной', emoji:'🫘', per100:{kcal:164,p:9,c:27,f:2.6,na:7,k:290}},
@@ -1273,7 +1283,7 @@ const FOOD_DB = [
   /* овощи и зелень */
   {name:'Помидор', emoji:'🍅', per100:{kcal:18,p:0.9,c:3.9,f:0.2,na:5,k:237}},
   {name:'Огурец свежий', emoji:'🥒', per100:{kcal:15,p:0.7,c:3.6,f:0.1,na:2,k:147}},
-  {name:'Перец болгарский', emoji:'🫑', per100:{kcal:27,p:1,c:6,f:0.3,na:4,k:210}},
+  {name:'П��рец болгарский', emoji:'🫑', per100:{kcal:27,p:1,c:6,f:0.3,na:4,k:210}},
   {name:'Морковь', emoji:'🥕', per100:{kcal:41,p:0.9,c:10,f:0.2,na:69,k:320}},
   {name:'Свёкла варёная', emoji:'🫑', per100:{kcal:44,p:1.7,c:10,f:0.2,na:77,k:305}},
   {name:'Капуста белокочанная', emoji:'🥬', per100:{kcal:25,p:1.3,c:6,f:0.1,na:18,k:170}},
@@ -1334,7 +1344,7 @@ const FOOD_DB = [
   {name:'Шаурма', emoji:'🌯', per100:{kcal:250,p:12,c:22,f:13,na:550,k:230}},
   {name:'Наггетсы', emoji:'🍗', per100:{kcal:296,p:15,c:16,f:19,na:540,k:250}},
   {name:'Хот-дог', emoji:'🌭', per100:{kcal:290,p:10,c:24,f:17,na:800,k:150}},
-  {name:'Роллы (Филадельфия)', emoji:'🍣', per100:{kcal:180,p:8,c:24,f:6,na:450,k:120}},
+  {name:'Роллы (Филадельф��я)', emoji:'🍣', per100:{kcal:180,p:8,c:24,f:6,na:450,k:120}},
   {name:'Пирожок жареный', emoji:'🥟', per100:{kcal:290,p:6,c:38,f:13,na:350,k:120}},
   {name:'Борщ', emoji:'🍲', per100:{kcal:49,p:1.6,c:5.5,f:2.3,na:350,k:200}},
   {name:'Суп куриный с лапшой', emoji:'🍲', per100:{kcal:55,p:3.5,c:6,f:2,na:340,k:80}},
@@ -1382,10 +1392,9 @@ const FOOD_DB = [
   {name:'Нут (сухой)', emoji:'🫘', per100:{kcal:364,p:19,c:61,f:6,na:24,k:718}},
   {name:'Фасоль (сухая)', emoji:'🫘', per100:{kcal:333,p:21,c:60,f:1.2,na:12,k:1406}},
   {name:'Горох (сухой)', emoji:'🫛', per100:{kcal:340,p:23,c:60,f:1.2,na:15,k:873}},
-  {name:'Макароны отварные', emoji:'🍝', per100:{kcal:112,p:3.5,c:23,f:0.4,na:1,k:24}},
+  {name:'Макароны отварные', emoji:'🍝', per100:{kcal:158,p:5.8,c:31,f:0.9,na:3,k:45}},
   {name:'Макароны по-флотски', emoji:'🍝', per100:{kcal:180,p:9,c:20,f:7,na:350,k:180}},
   {name:'Овсянка на молоке', emoji:'🥣', per100:{kcal:102,p:3.7,c:14,f:3.1,na:35,k:110}},
-  {name:'Овсяные хлопья (сухие)', emoji:'🌾', per100:{kcal:352,p:12,c:62,f:6.2,na:3,k:330}},
   {name:'Кукурузная каша', emoji:'🌽', per100:{kcal:90,p:2.1,c:19,f:0.5,na:5,k:60}},
   {name:'Ячневая каша', emoji:'🥣', per100:{kcal:96,p:3.5,c:18,f:1.1,na:5,k:80}},
   {name:'Картофель жареный', emoji:'🍟', per100:{kcal:192,p:2.8,c:23,f:9.5,na:15,k:460}},
@@ -1402,7 +1411,7 @@ const FOOD_DB = [
   {name:'Морковь по-корейски', emoji:'🥕', per100:{kcal:113,p:1.2,c:9,f:8,na:480,k:180}},
   {name:'Кабачковая икра', emoji:'🥫', per100:{kcal:97,p:1.2,c:7,f:7,na:500,k:240}},
   {name:'Лечо', emoji:'🥫', per100:{kcal:60,p:1,c:8,f:2.5,na:400,k:180}},
-  {name:'Чеснок', emoji:'🧄', per100:{kcal:143,p:6.5,c:30,f:0.5,na:17,k:400}},
+  {name:'Чеснок', emoji:'���', per100:{kcal:143,p:6.5,c:30,f:0.5,na:17,k:400}},
   {name:'Вешенки жареные', emoji:'🍄', per100:{kcal:60,p:3,c:4.5,f:3.5,na:15,k:260}},
   {name:'Томатная паста', emoji:'🥫', per100:{kcal:82,p:4.3,c:17,f:0.5,na:60,k:880}},
   /* фрукты, ягоды */
@@ -1522,7 +1531,7 @@ async function searchOpenFoodFacts(query){
 }
 async function lookupBarcodeOFF(code){
   const url = 'https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_ru,brands,nutriments,status';
-  /* сервер OFF часто не отвечает или отвечает с ошибкой с первого раза — как и в текстовом
+  /* сервер OFF часто не отвеча��т и��и отвечает с ошибкой с первого раза — как и в текстовом
      поиске, даём ещё 2 попытки с растущим таймаутом, прежде чем считать, что продукта нет */
   let lastErr = null;
   for(const ms of [6000, 9000, 12000]){
@@ -1604,8 +1613,8 @@ function tdee(p){ return bmr(p) * (ACTIVITY_MULT[p.activity] || 1.375); }
 /* дефицит в процентах от нормы */
 const GOAL_PCT = { maintain:0, slow:0.10, moderate:0.20, fast:0.28 };
 /* ручной режим: норма КБЖУ задана в настройках — тогда всё, что зависит от нормы
-   (кольцо, остаток, белок, календарь, аналитика, графики, прогноз и советы)
-   считается от его чисел, а не от формулы */
+   (кольцо, остаток, белок, календарь, аналитика, графики, ��рогноз и советы)
+   считается от его чисел, а не от фор��улы */
 function customOn(p){ return !!(p && p.custom && p.custom.on && p.custom.kcal > 0); }
 function goalRateKgWeek(p){
   if(customOn(p)) return Math.round((tdee(p) - goalCalories(p))*7/7700*20)/20;
@@ -1704,6 +1713,18 @@ function streakInfo(){
 /* ================= UI-база ================= */
 const app = document.getElementById('app');
 
+/* приводим состояние к рабочему виду: битая/частичная копия (старый бэкап,
+   неполное облако) больше не роняет рендер на первом же обращении к полю */
+function normalizeState(){
+  ['foodLog','waterLog','stepsLog','workoutLog','foodFreq','stamps','tomb'].forEach(k=>{
+    if(!S[k] || typeof S[k]!=='object' || Array.isArray(S[k])) S[k] = {};
+  });
+  ['weightLog','customFoods'].forEach(k=>{ if(!Array.isArray(S[k])) S[k] = []; });
+  if(!S.theme || typeof S.theme!=='object') S.theme = {dark:null, accent:'orange'};
+  if(typeof S.theme.accent!=='string') S.theme.accent = 'orange';
+  if(S.profile && typeof S.profile!=='object') S.profile = null;
+  S.goalShown = !!S.goalShown;
+}
 function applyTheme(){
   const root = document.documentElement;
   let dark = S.theme.dark;
@@ -1764,7 +1785,6 @@ function openSheet(html){
 }
 function closeSheet(){ editDs = null;
   if(typeof stopScanner==='function') stopScanner();
-  if(typeof stopMotion==='function') {}
   const overlay = document.getElementById('sheetOverlay');
   if(overlay) overlay.classList.remove('open');
   document.documentElement.classList.remove('no-scroll');
@@ -1831,7 +1851,7 @@ async function init(){
     const loaded = await storageLoad();
     if(loaded && typeof loaded==='object') S = Object.assign(S, loaded);
   }catch(e){}
-  S.stamps = S.stamps || {}; S.tomb = S.tomb || {};
+  normalizeState();
   S.uid = TG_UID || S.uid || '';
   _snap = snapshot(S); /* базовая точка: дальше каждая правка получает свою метку времени */
   if(!S.profile && params.get('demo')==='1') seedDemo();
@@ -1965,18 +1985,9 @@ function renderOnboarding(step){
     }
     /* Звук барабана аларма iPhone */
     let _lastIdx = -1;
-    function drumClick(){
-      try{
-        const ctx = new (window.AudioContext||window.webkitAudioContext)();
-        const buf = ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1)*Math.pow(1-i/data.length, 6)*0.25;
-        const src = ctx.createBufferSource(); src.buffer = buf;
-        const gain = ctx.createGain(); gain.gain.setValueAtTime(1, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.04);
-        src.connect(gain); gain.connect(ctx.destination); src.start();
-        setTimeout(()=>ctx.close(),100);
-      }catch(e){}
-    }
+    /* была точная копия drumTick() с созданием AudioContext на каждый тик колеса —
+       на быстрой прокрутке браузер упирался в лимит контекстов и звук пропадал */
+    const drumClick = drumTick;
     wheel.addEventListener('scroll', ()=>{
       clearTimeout(wheel._t);
       updateSelection();
@@ -2210,14 +2221,13 @@ function renderHome(){
   const targetFat = mt.fat;
   const targetCarbs = mt.carbs;
   const protein = dayMacro(ds,'p');
-  const missingP = targetProtein - protein;
   const hour = new Date().getHours();
   let warn = '';
   const warnKey = `warnDismissed_${todayStr()}`;
   const warnDismissed = sessionStorage.getItem(warnKey);
   if(!warnDismissed){
     if(hasEaten && hour>=18 && (goal - consumed) > 900)
-      warn = `<div class="warn-card red rise" id="warnCard"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Пока что дефицит выходит слишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
+      warn = `<div class="warn-card red rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Пока что дефицит выходит слишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
     else if(consumed > goal + 250)
       warn = `<div class="warn-card rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Сегодня ${consumed - goal} ккал сверх нормы. Ничего страшного — просто вернись в ритм завтра</span></div>`;
   }
@@ -2245,7 +2255,7 @@ function renderHome(){
             <div class="ring-kcal-unit">ккал</div>
           </div>
         </div>
-        ${burned>0?`<div class="ring-burn">+ ${burned} ккал сожжено активностью</div>`:''}
+        ${burned>0?`<div class="ring-burn">+ ${burned} ккал сожжено активностью · уже учтено в норме</div>`:''}
         <div class="ring-sub">Для снижения веса на ~${rateWeek||0} кг в неделю</div>
       </div>
 
@@ -2321,7 +2331,7 @@ function getSmartAdvice(){
 /* ================= Экран достижения цели ================= */
 function checkGoalReached(){
   const p = S.profile;
-  if(!p || !p.targetWeight || !S.weightLog.length) return;
+  if(!p || !p.targetWeight || !Array.isArray(S.weightLog) || !S.weightLog.length) return;
   const sorted = [...S.weightLog].sort((a,b)=>a.date.localeCompare(b.date));
   const last = sorted[sorted.length-1].weight;
   if(last > p.targetWeight + 1){ if(S.goalShown){ S.goalShown = false; save(); } return; }
@@ -2340,8 +2350,8 @@ function showGoalOverlay(w){
   ov.id = 'goalOverlay';
   ov.innerHTML = `${conf}
     <div class="goal-emoji">🏆</div>
-    <div class="goal-big">Цель достигнута!</div>
-    <div class="goal-sub">${w.toFixed(1)} кг — ты дошёл до целевого веса.<br>Огромная работа. Горжусь!</div>
+    <div class="goal-big">Ц��ль достигнута!</div>
+    <div class="goal-sub">${w.toFixed(1)} кг — целевой вес взят.<br>Огромная работа. Горжусь!</div>
     <button class="btn-primary" style="max-width:260px;margin-top:26px" data-act="closeGoal">Продолжить</button>`;
   document.body.appendChild(ov);
   haptic('ok');
@@ -2361,7 +2371,7 @@ function edemaHtml(){
   const kNa = na>0 ? k/na : (k>0 ? 99 : 0);
   let ratioState, ratioLabel, ratioNote;
   if(!hasNk){ ratioState='mid'; ratioLabel='—'; ratioNote='Пока нет данных о натрии и калии — добавь продукты из базы, и я рассчитаю баланс'; }
-  else if(kNa >= 4){ ratioState='good'; ratioLabel='Идеальный'; ratioNote='Калия в 4–5 раз больше натрия — идеальный баланс, лишняя вода не задерживается'; }
+  else if(kNa >= 4){ ratioState='good'; ratioLabel='Идеальный'; ratioNote='Калия в 4���5 раз больше натрия — идеальный баланс, лишняя вода не задерживается'; }
   else if(kNa >= 2){ ratioState='mid'; ratioLabel='В норме'; ratioNote='Калия в 2–3 раза больше натрия — неплохо, но до идеала (4–5 к 1) добавь бананы, авокадо, шпинат, зелень или выпей добавку'; }
   else { ratioState='bad'; ratioLabel='Мало'; ratioNote='Калия слишком мало по отношению к натрию — это задерживает воду. Добавь картофель, бананы, авокадо, шпинат или курагу'; }
   const covNote = cov==='partial' ? '<div class="metric-note" style="margin-top:6px;opacity:.8">У части продуктов сегодня нет данных о натрии/калии — показаны только те, где данные есть</div>' : '';
@@ -2389,7 +2399,7 @@ function edemaHtml(){
     <div class="metric-card rise" style="animation-delay:.06s">
       <button class="info-dot" data-act="infoWater">${ic('info')}</button>
       <div class="metric-lbl">Выпито воды:</div>
-      <div class="metric-big${water>=WATER_MAX?' over':''}" id="waterBig"><span class="val">${wLitre} л</span><span class="limit2"> / ${nLitre} л</span></div>
+      <div class="metric-big${(water>=WATER_MAX || water>norm*1.5)?' over':''}" id="waterBig"><span class="val">${wLitre} л</span><span class="limit2"> / ${nLitre} л</span></div>
       <div class="water-glasses" id="waterGlasses">${waterGlassesHtml(water, norm)}</div>
     </div>
 
@@ -2423,7 +2433,9 @@ function updateWaterCard(){
   if(big){
     const wL = (water/1000).toFixed(water%1000===0?0:1);
     const nL = (norm/1000).toFixed(norm%1000===0?0:1);
-    big.classList.toggle('over', water >= WATER_MAX);
+    /* красным подсвечиваем перебор относительно НОРМЫ, а не только на максимуме в 10 л:
+       текст в «Почему вода» говорит именно про перелив сверх нормы */
+    big.classList.toggle('over', water >= WATER_MAX || water > waterNormMl()*1.5);
     big.innerHTML = `<span class="val">${wL} л</span><span class="limit2"> / ${nL} л</span>`;
   }
   const wrap = document.getElementById('waterGlasses');
@@ -2453,7 +2465,7 @@ ACTIONS.toggleGlass = (arg)=>{
 ACTIONS.edemaToActivity = ()=>{ closeSheet(); ui.tab='activity'; renderTab(); };
 ACTIONS.infoSalt = ()=> openModal(`
   <div class="modal-title">Соль и отёки</div>
-  <div class="modal-text">Чтобы не допускать задержку жидкости, ешь не более 4.5 г соли в день</div>
+  <div class="modal-text">Чтобы не допускать задержку жидкости, ешь не более 4.5 г соли �� день</div>
   <div class="modal-text">Не добавляй соль в еду, <b>сократи</b> или <b>исключи</b> хлеб, чипсы, соусы, полуфабрикаты, сыр, фастфуд, колбасы, сосиски и подобное</div>
   <div class="modal-text">Идеальное соотношение калия к натрию – 4-5 к 1 (в пользу калия). <b>Источники калия:</b> бананы, авокадо, шпинат, картофель, бобовые, курага, орехи</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
@@ -2518,7 +2530,8 @@ ACTIONS.delWorkout = (arg)=>{
   const ds = logDs();
   (S.workoutLog[ds]||[]).splice(parseInt(arg),1);
   save(); renderTab();
-  if(document.getElementById('sheetOverlay').classList.contains('open')) openSheet(workoutsHtml());
+  const so = document.getElementById('sheetOverlay'); /* без гарда падало, если шторки ещё нет в DOM */
+  if(so && so.classList.contains('open')) openSheet(workoutsHtml());
 };
 ACTIONS.saveSteps = ()=>{
   const v = parseInt(document.getElementById('stepsInput').value);
@@ -2555,7 +2568,7 @@ function workoutsHtml(){
 ACTIONS.openWorkouts = ()=> openSheet(workoutsHtml());
 ACTIONS.backToDay = ()=>{ if(editDs) openSheet(dayEditorHtml(editDs)); };
 
-/* Виды активности. MET на 4 уровня тяжести; perKm — точный расчёт по дистанции */
+/* Виды активности. MET на 4 уровня тяжести; perKm — точный расчёт по дистанц��и */
 const ACTS = [
   {k:'strength', e:'🏋️', n:'Силовая тренировка', met:[3.5,5,6,7.5]},
   {k:'run', e:'🏃', n:'Бег', met:[7,8.5,10.5,12.5], dist:true, perKm:1.03},
@@ -2569,7 +2582,7 @@ const ACTS = [
   {k:'cardio', e:'❤️', n:'Кардио', met:[4.5,6,8,10], dist:true, perKm:0.85},
   {k:'other', e:'✏️', n:'Другое', met:[3.5,5,6.5,8]},
 ];
-const EFFORTS = [ {e:'😌',n:'Легко'}, {e:'🙂',n:'Умеренно'}, {e:'😤',n:'Тяжело'}, {e:'🥵',n:'Очень тяжело'} ];
+const EFFORTS = [ {e:'😌',n:'Легко'}, {e:'🙂',n:'Умеренно'}, {e:'😤',n:'Тяжело'}, {e:'🥵',n:'Очень тя��ело'} ];
 const MUSCLE_ZONES = [
   {n:'Всё тело', f:1.15, solo:true},
   {n:'Верх', f:1.0, solo:true},
@@ -2584,16 +2597,24 @@ const MUSCLE_ZONES = [
 const wDraft = { act:0, mins:null, eff:null, muscles:[], km:null, custom:'' };
 
 /* Звук барабана как в будильнике iOS */
+/* ОДИН общий AudioContext и ОДИН заранее сгенерированный буфер на всё приложение */
+let _audioCtx = null, _drumBuf = null;
 function drumTick(){
   try{
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    const buf = ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1)*Math.pow(1-i/data.length, 6)*0.25;
-    const s = ctx.createBufferSource(); s.buffer = buf;
-    const gain = ctx.createGain(); gain.gain.setValueAtTime(1, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.04);
-    s.connect(gain); gain.connect(ctx.destination); s.start();
-    setTimeout(()=>ctx.close(),100);
+    const AC = window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    if(!_audioCtx) _audioCtx = new AC();
+    if(_audioCtx.state==='suspended') _audioCtx.resume();
+    if(!_drumBuf){
+      _drumBuf = _audioCtx.createBuffer(1, Math.round(_audioCtx.sampleRate*0.04), _audioCtx.sampleRate);
+      const data = _drumBuf.getChannelData(0);
+      for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1)*Math.pow(1-i/data.length, 6)*0.25;
+    }
+    const s = _audioCtx.createBufferSource(); s.buffer = _drumBuf;
+    const gain = _audioCtx.createGain();
+    gain.gain.setValueAtTime(1, _audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime+0.04);
+    s.connect(gain); gain.connect(_audioCtx.destination); s.start();
   }catch(e){}
 }
 
@@ -2863,7 +2884,9 @@ function bumpFreq(food){
 function freqScore(name){
   const e = S.foodFreq[freqKey(name)];
   if(!e) return 0;
-  const days = Math.max(0, Math.round((Date.now() - new Date(e.last+'T00:00:00').getTime())/86400000));
+  /* у записи может не быть даты (старые/слитые данные) — без гарда был NaN и сортировка ломалась */
+  const lastTs = e.last ? new Date(e.last+'T00:00:00').getTime() : NaN;
+  const days = isFinite(lastTs) ? Math.max(0, Math.round((Date.now() - lastTs)/86400000)) : 999;
   const recency = days<=1?6 : days<=3?3 : days<=7?1 : 0;
   return e.n*3 + recency;
 }
@@ -2917,7 +2940,7 @@ function renderFoodTabBody(){
       </div>
       <div class="scan-status" id="scanStatus">Наведи камеру на штрихкод упаковки</div>
       <div class="manual-barcode-row">
-        <input class="plain-input" id="manualCode" type="number" inputmode="numeric" placeholder="Или введи код вручную">
+        <input class="plain-input" id="manualCode" type="number" inputmode="numeric" placeholder="Ил�� введи код вручную">
         <button class="btn-secondary" style="width:auto;padding:0 18px" data-act="manualBarcode">OK</button>
       </div>
       <div id="scanResult"></div>`;
@@ -2946,7 +2969,6 @@ function renderFoodTabBody(){
       ${S.customFoods.length
         ? S.customFoods.map((f,i)=>`<div style="position:relative">${foodResultHtml(f)}<button class="log-del" style="position:absolute;right:46px;top:50%;transform:translateY(-50%)" data-act="delCustomFood" data-arg="${i}">×</button></div>`).join('')
         : '<div class="empty-hint">Сохранённых блюд пока нет</div>'}`;
-    bindCustomFoodForm();
   }
 }
 
@@ -3041,7 +3063,6 @@ ACTIONS.toggleCfPub = ()=>{
   if(sw) sw.classList.toggle('on', cfPublic);
   haptic('ok');
 };
-function bindCustomFoodForm(){ /* авторасчёта калорий больше нет — всё вводится вручную, десятые поддерживаются */ }
 ACTIONS.saveCustomFood = ()=>{
   const name = document.getElementById('cfName').value.trim();
   const numv = id => parseFloat(String(document.getElementById(id).value).replace(',','.'));
@@ -3063,7 +3084,7 @@ ACTIONS.saveCustomFood = ()=>{
       showToast('Сохранено! Отправляем в общую базу…');
       publishFood(food).then(ok=> showToast(ok? 'Продукт опубликован для всех' : 'Не удалось опубликовать — продукт сохранён локально'));
     } else {
-      showToast('Общая база не подключена — продукт сохранён локально');
+      showToast('Общая база не ��одключена — продукт сохранён локально');
     }
   } else {
     showToast('Сохранено в «Своё блюдо»');
@@ -3091,8 +3112,10 @@ ACTIONS.pickFood = (arg)=>{
     const per = pickedFood.per100;
     if(el && per) el.textContent = `${Math.round(per.kcal*pickedGrams/100)} ккал · Б ${Math.round(per.p*pickedGrams/100)} · У ${Math.round(per.c*pickedGrams/100)} · Ж ${Math.round(per.f*pickedGrams/100)}`;
   };
-  document.querySelectorAll('[data-g]').forEach(p=>{ p.onclick = ()=>{
-    document.querySelectorAll('[data-g]').forEach(x=>x.classList.remove('active'));
+  /* селектор ограничен шторкой: глобальный [data-g] цеплял и карточки пола в онбординге */
+  const gScope = document.getElementById('sheetOverlay') || document;
+  gScope.querySelectorAll('[data-g]').forEach(p=>{ p.onclick = ()=>{
+    gScope.querySelectorAll('[data-g]').forEach(x=>x.classList.remove('active'));
     p.classList.add('active');
     pickedGrams = parseInt(p.dataset.g);
     document.getElementById('gramInput').value = pickedGrams;
@@ -3110,7 +3133,7 @@ function addPickedToLog(grams){
     item = { name:f.name, emoji:f.emoji||'🍽', time:nowTime(), grams:Math.round(grams),
       kcal:Math.round(per.kcal*m), p:r1(per.p*m), c:r1(per.c*m), f:r1(per.f*m),
       na: per.na!=null? Math.round(per.na*m) : null, k: per.k!=null? Math.round(per.k*m) : null,
-      /* храним базу на 100 г — правки граммовки пересчитываются от неё, без накопления ошибки округления */
+      /* храним базу на 100 г — правки граммовки пересчитываются от неё, без накопления ошиб��и округления */
       per100: { kcal:per.kcal, p:per.p, c:per.c, f:per.f, na:per.na!=null?per.na:null, k:per.k!=null?per.k:null } };
   } else {
     const x = f.fixed || f;
@@ -3129,6 +3152,7 @@ function addPickedToLog(grams){
 /* ================= Сканер штрихкодов ================= */
 let scannerActive = false;
 let scanTrack = null, torchOn = false;
+let scanStream = null; /* держим ссылку на поток: без неё камера оставалась включённой */
 function setupTorch(){
   const btn = document.getElementById('torchBtn');
   if(!btn) return;
@@ -3149,7 +3173,10 @@ function stopScanner(){
   if(scannerActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} }
   scannerActive = false;
   if(scanTrack){ try{ scanTrack.applyConstraints({advanced:[{torch:false}]}); }catch(e){} }
-  scanTrack = null; torchOn = false;
+  /* гасим камеру сразу, а не на следующем кадре цикла детектора:
+     если вкладка ушла в фон, rAF не вызывался и огонёк камеры горел дальше */
+  if(scanStream){ try{ scanStream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+  scanStream = null; scanTrack = null; torchOn = false;
 }
 function loadQuagga(){
   return new Promise((res, rej)=>{
@@ -3172,19 +3199,22 @@ async function startScanner(){
       const video = document.createElement('video');
       video.srcObject = stream; video.autoplay = true; video.muted = true; video.playsInline = true;
       video.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:20px;';
-      scanBox.innerHTML = ''; scanBox.appendChild(video);
+      /* раньше innerHTML='' стирал рамку и линию прицела — в нативном режиме они пропадали */
+      const oldVideo = scanBox.querySelector('video'); if(oldVideo) oldVideo.remove();
+      scanBox.insertBefore(video, scanBox.firstChild);
       scannerActive = true;
+      scanStream = stream;
       scanTrack = stream.getVideoTracks()[0]; setupTorch();
       const detector = new BarcodeDetector({ formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf'] });
       let lastCode = '', hits = 0;
       const scan = async ()=>{
-        if(!scannerActive){ stream.getTracks().forEach(t=>t.stop()); scanTrack = null; return; }
+        if(!scannerActive){ stopScanner(); return; }
         try{
           const codes = await detector.detect(video);
           if(codes.length){
             const code = codes[0].rawValue;
             if(code===lastCode) hits++; else { lastCode = code; hits = 1; }
-            if(hits>=2){ scannerActive = false; stream.getTracks().forEach(t=>t.stop()); scanTrack = null; handleBarcode(code); return; }
+            if(hits>=2){ stopScanner(); handleBarcode(code); return; }
           }
         }catch(_){}
         requestAnimationFrame(scan);
@@ -3346,7 +3376,7 @@ function renderStatsTab(){
     <div class="topbar"><div class="topbar-title">Аналитика</div><div class="topbar-sub">За последние 30 дней</div></div>
     <div class="screen">
       <div class="stat-grid">
-        <div class="stat-card rise"><div class="stat-lbl">Средний дефицит</div><div class="stat-val" style="color:${avgDef<0?'var(--green)':'var(--red)'}">${avgDef<=0?'−':'+'}${Math.abs(avgDef)} ккал</div></div>
+        <div class="stat-card rise"><div class="stat-lbl">Средний дефицит</div><div class="stat-val" style="color:${avgDef<0?'var(--green)':avgDef>0?'var(--red)':'var(--text)'}">${avgDef===0?'':(avgDef<0?'−':'+')}${Math.abs(avgDef)} ккал</div></div>
         <div class="stat-card rise" style="animation-delay:.04s"><div class="stat-lbl">Средний белок</div><div class="stat-val">${avgP} г</div></div>
         <div class="stat-card rise" style="animation-delay:.08s;grid-column:1/-1;text-align:center"><div class="stat-lbl">Средний вес</div><div class="stat-val">${avgW} кг</div></div>
       </div>
@@ -3371,7 +3401,7 @@ function renderStatsTab(){
         <div class="calendar-grid">${cal}</div>
         <div class="cal-legend"><span><i class="cal-dot ok"></i>в норме</span><span><i class="cal-dot warn"></i>отклонение</span><span><i class="cal-dot bad"></i>перебор</span><span><i class="cal-dot frozen"></i>заморозка</span></div>
       </div>
-      ${si.display>0?`<div class="advice-card rise" style="animation-delay:.22s"><div class="advice-head"><span class="advice-dot"></span>Стрик</div><div class="advice-text">${si.display}-й день подряд. Доступно 3 заморозки в месяц, так что пропущенный день не сломает огонёк</div></div>`:''}
+      ${si.display>0?`<div class="advice-card rise" style="animation-delay:.22s"><div class="advice-head"><span class="advice-dot"></span>Стрик</div><div class="advice-text">${si.display}-й день подряд. Доступно 3 заморозки в месяц, так что пр��пущенный день не сломает огонёк</div></div>`:''}
     </div>`;
 }
 TABS.stats = { html: renderStatsTab };
@@ -3483,7 +3513,7 @@ function renderSettingsTab(){
         <button class="data-btn" data-act="openImport"><span class="data-btn-ic">${ic('history')}</span>Импорт истории сушки<span class="data-btn-sub">восстановит стрик, графики и статистику</span></button>
         <button class="data-btn" data-act="exportData"><span class="data-btn-ic">${ic('download')}</span>Экспорт / резервная копия<span class="data-btn-sub">все данные одним файлом</span></button>
         <button class="data-btn" data-act="openRestore"><span class="data-btn-ic">${ic('restore')}</span>Восстановить из копии<span class="data-btn-sub">вставь сохранённый текст копии</span></button>
-        <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>Сбросить всё<span class="data-btn-sub">удалить профиль и историю</span></button>
+        <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>��бросить всё<span class="data-btn-sub">удалить профиль и историю</span></button>
       </div>`;
   }
   return `
@@ -3497,7 +3527,7 @@ function bindSettings(){
   const num = (id, fn)=>{ const el = document.getElementById(id); if(el) el.onchange = ()=>{ const v = parseFloat(el.value); if(!isNaN(v)) fn(v); save(); renderTab(); }; };
   const sName = document.getElementById('sName');
   if(sName) sName.onchange = ()=>{ if(sName.value.trim()) S.profile.name = sName.value.trim(); save(); renderTab(); };
-  num('sAge', v=>{ S.profile.age = Math.max(10, Math.min(100, Math.round(v))); });
+  num('sAge', v=>{ S.profile.age = Math.max(AGE_MIN, Math.min(100, Math.round(v))); });
   num('sHeight', v=>{ S.profile.height = Math.max(100, Math.min(250, Math.round(v))); });
   num('sWeight', v=>{
     if(v>=30 && v<=300){
@@ -3509,7 +3539,8 @@ function bindSettings(){
   });
   num('sTarget', v=>{ if(v>=30 && v<=300){ S.profile.targetWeight = r1(v); checkGoalReached(); } });
   /* ручные КБЖУ */
-  const setC = (patch)=>{ S.profile.custom = Object.assign({on:true}, S.profile.custom||{}, patch); };
+  /* {on:true} должен идти ПОСЛЕДНИМ: иначе старое on:false из custom его перебивало */
+  const setC = (patch)=>{ S.profile.custom = Object.assign({}, S.profile.custom||{}, patch, {on:true}); };
   num('cKcal', v=>{ setC({ kcal: Math.max(600, Math.min(8000, Math.round(v))) }); });
   num('cP', v=>{ setC({ p: Math.max(0, Math.min(600, Math.round(v))) }); });
   num('cF', v=>{ setC({ f: Math.max(0, Math.min(400, Math.round(v))) }); });
@@ -3664,7 +3695,11 @@ ACTIONS.exportData = ()=>{
 };
 ACTIONS.copyExport = ()=>{
   const ta = document.getElementById('expText');
+  /* iOS Safari не даёт выделить readonly-поле — снимаем флаг на время копирования */
+  const wasRO = ta.hasAttribute('readonly');
+  if(wasRO) ta.removeAttribute('readonly');
   ta.select(); ta.setSelectionRange(0, 9999999);
+  if(wasRO) setTimeout(()=>ta.setAttribute('readonly',''), 0);
   let ok = false;
   try{ ok = document.execCommand('copy'); }catch(e){}
   if(!ok && navigator.clipboard){ navigator.clipboard.writeText(ta.value).then(()=>showToast('Скопировано')).catch(()=>showToast('Выдели и скопируй вручную')); }
@@ -3683,6 +3718,8 @@ ACTIONS.applyRestore = ()=>{
     const data = JSON.parse(document.getElementById('restText').value);
     if(!data || typeof data!=='object' || !data.profile) throw new Error('bad');
     S = Object.assign({ foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false }, data);
+    /* в бэкапе могут быть null/битые поля — раньше это роняло тему и рендер */
+    normalizeState();
     S.uid = TG_UID || ''; S.stamps = {}; S.tomb = {};
     _snap = null; /* всё содержимое копии получит свежие метки и разойдётся на все устройства */
     save(true); applyTheme(); closeSheet(); haptic('ok');
