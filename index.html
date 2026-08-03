@@ -318,9 +318,10 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .lock-screen{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; padding:40px 28px; text-align:center; gap:14px; }
 .lock-logo{ font-size:54px; margin-bottom:4px; }
 .lock-reason{ font-size:11px; color:var(--text-secondary); opacity:.55; margin-top:8px; }
-.act-hero{ display:grid; grid-template-columns:1.25fr 1fr; gap:14px; align-items:stretch; margin-top:8px; }
+/* grid-auto-rows:1fr — чтобы карточка «Тренировки» была ровно той же высоты, что и шаги */
+.act-hero{ display:grid; grid-template-columns:1.25fr 1fr; grid-auto-rows:1fr; gap:14px; align-items:stretch; margin-top:8px; }
 .steps-card{ flex:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
-.train-card{ flex:1; align-self:stretch; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
+.train-card{ flex:1; align-self:stretch; height:100%; min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
 .train-icon{ width:54px; height:54px; border-radius:18px; background:var(--chip); color:var(--chip-text); display:flex; align-items:center; justify-content:center; }
 .train-icon svg{ width:26px; height:26px; }
 .steps-ring-holder{ position:relative; width:148px; height:148px; margin:0 auto; }
@@ -335,7 +336,9 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .workout-kcal-val{ font-size:16px; font-weight:900; }
 .empty-mid{ text-align:center; font-size:16px; font-weight:700; color:var(--text-secondary); padding:34px 10px 26px; }
 .step-block{ overflow:hidden; max-height:0; opacity:0; transition:max-height .5s var(--ease-out), opacity .4s ease, margin .4s ease; margin-top:0; }
-.step-block.revealed{ max-height:400px; opacity:1; margin-top:14px; }
+/* max-height был 400px при overflow:hidden — ряды мышечных групп, не влезшие в эту
+   высоту, обрезались и по ним нельзя было попасть пальцем */
+.step-block.revealed{ max-height:1400px; opacity:1; margin-top:14px; }
 @keyframes caretBlink{ 0%,45%{opacity:1} 55%,100%{opacity:0} }
 input.plain-input, textarea.plain-input, .plain-input, .search-input, .input-field{
   caret-color:var(--accent); animation:none;
@@ -583,7 +586,7 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 "use strict";
 
 /* ================= Telegram + среда ================= */
-/* реальный Telegram определяем по документированному WebApp.platform (не по несуществующему initDataUnavailable) */
+/* реальный Telegram определяем по документ��рованному WebApp.platform (не по несуществующему initDataUnavailable) */
 const _WA = window.Telegram && window.Telegram.WebApp;
 const tg = (_WA && _WA.platform && _WA.platform !== 'unknown') ? _WA : null;
 let cloudOK = false;
@@ -698,7 +701,7 @@ function csRemoveItems(keys){ return new Promise(res=>{ try{ tg.CloudStorage.rem
 function clone(x){ try{ return x==null? x : JSON.parse(JSON.stringify(x)); }catch(e){ return x; } }
 function newId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
-/* ---------- слияние состояний (коммутативно: результат н�� зависит от порядка) ---------- */
+/* ---------- слияние состояний (коммутативно: результат не зависит от порядка) ---------- */
 function itemKey(it){ return it && (it.id || ((it.time||'') + '|' + (it.name||it.label||'') + '|' + (it.kcal||0))); }
 function mergeItemLogs(a, b, tomb){
   const out = {};
@@ -1118,7 +1121,7 @@ let ui = { tab:'home', settingsTab:'profile' };
    Пока ACCESS_FN_URL пуст — проверка выключена и приложение работает как раньше. */
 const ACCESS_FN_URL = 'https://clolqywsqbggnkyikjaq.supabase.co/functions/v1/check-access'; /* ВСТАВЬ: https://<project-ref>.supabase.co/functions/v1/check-access */
 const ACCESS_LINK = ''; /* ВСТАВЬ ссылку на ПОКУПКУ доступа (бот оплаты/менеджер), а не инвайт в закрытый канал */
-/* кэш ответа о доступе живёт �� localStorage устройства, а НЕ в синхронизируемом
+/* кэш ответа о доступе живёт в localStorage устройства, а НЕ в синхронизируемом
    состоянии: иначе он раздувал облако и разъезжался между устройствами */
 function accessCacheKey(){ return 'access_cache_' + (TG_UID || 'anon'); }
 function readAccessCache(){ try{ return JSON.parse(localStorage.getItem(accessCacheKey()) || 'null'); }catch(e){ return null; } }
@@ -1152,7 +1155,7 @@ function renderLock(expired){
 }
 function gateJoinChannel(){
   if(ACCESS_LINK){ if(tg && tg.openTelegramLink) tg.openTelegramLink(ACCESS_LINK); else window.open(ACCESS_LINK, '_blank'); return; }
-  /* ссылка на покупку ещё не настроена — возвращаем пользователя в чат с ботом, где он оформит доступ, вместо тупика */
+  /* ссылка на покупку ещё не настроена — возвращ��ем пользователя в чат с ботом, где он оформит доступ, вместо тупика */
   showToast('Открой чат с ботом, чтобы оформить доступ');
   if(tg && tg.close) setTimeout(()=>{ try{ tg.close(); }catch(e){} }, 900);
 };
@@ -1160,7 +1163,7 @@ async function gateRecheckAccess(){
   showToast('Проверяем…');
   const a = await checkAccess();
   if(a && a.access!=='expired') location.reload();
-  else showToast('Подписка не найдена — оформи доступ и попробуй снова');
+  else showToast('Подписка не найден�� — оформи доступ и попробуй снова');
 };
 let editDs = null; /* дата, для которой редактируется питание (null = сегодня) */
 function logDs(){ return editDs || todayStr(); }
@@ -1176,7 +1179,7 @@ function r1(x){ return Math.round(x*10)/10; }
 /* ================= База продуктов (работает без интернета) =================
    na/k — натрий/калий, мг на 100 г */
 const FOOD_DB = [
-  /* закреплённая доб��вка: 1 порция = 1 г порошка ≈ 365 мг чистого калия, 0 ккал */
+  /* закреплённая добавка: 1 порция = 1 г порошка ≈ 365 мг чистого калия, 0 ккал */
   {name:'Калий цитрат (1 г)', emoji:'💊', pinned:true, fixed:{kcal:0,p:0,c:0,f:0,na:0,k:365}},
   {name:'Куриная грудка (варёная)', emoji:'🍗', per100:{kcal:165,p:31,c:0,f:3.6,na:64,k:350}},
   {name:'Рис отварной', emoji:'🍚', per100:{kcal:130,p:2.7,c:28,f:0.3,na:5,k:35}},
@@ -1197,7 +1200,7 @@ const FOOD_DB = [
   {name:'Сыр твёрдый', emoji:'🧀', per100:{kcal:350,p:25,c:1.3,f:27,na:700,k:100}},
   {name:'Брокколи на пару', emoji:'🥦', per100:{kcal:35,p:2.4,c:7,f:0.4,na:30,k:300}},
   {name:'Картофель отварной', emoji:'🥔', per100:{kcal:87,p:1.9,c:20,f:0.1,na:4,k:380}},
-  {name:'Говя��ина (постная)', emoji:'🥩', per100:{kcal:187,p:26,c:0,f:8.6,na:60,k:320}},
+  {name:'Говядина (постная)', emoji:'🥩', per100:{kcal:187,p:26,c:0,f:8.6,na:60,k:320}},
   {name:'Салат овощной с маслом', emoji:'🥗', per100:{kcal:95,p:1.5,c:6,f:7,na:200,k:250}},
   {name:'Протеиновый батончик', emoji:'🍫', per100:{kcal:380,p:30,c:35,f:12,na:200,k:250}},
   {name:'Арахисовая паста', emoji:'🥜', per100:{kcal:588,p:25,c:20,f:50,na:400,k:650}},
@@ -1211,7 +1214,7 @@ const FOOD_DB = [
   {name:'Соевый соус', emoji:'🍶', per100:{kcal:53,p:6,c:6.6,f:0,na:5500,k:220}},
   {name:'Кетчуп', emoji:'🫙', per100:{kcal:100,p:1.2,c:24,f:0.1,na:900,k:280}},
   {name:'Майонез', emoji:'🫙', per100:{kcal:680,p:1,c:2.6,f:75,na:635,k:20}},
-  {name:'Пель��ени отварные', emoji:'🥟', per100:{kcal:245,p:11,c:26,f:11,na:550,k:180}},
+  {name:'Пельмени отварные', emoji:'🥟', per100:{kcal:245,p:11,c:26,f:11,na:550,k:180}},
   /* мясо и птица */
   {name:'Индейка (филе)', emoji:'🍗', per100:{kcal:114,p:24,c:0,f:1.7,na:63,k:300}},
   {name:'Куриное бедро без кожи', emoji:'🍗', per100:{kcal:185,p:24,c:0,f:9.5,na:86,k:240}},
@@ -1242,7 +1245,7 @@ const FOOD_DB = [
   {name:'Омлет из 2 яиц', emoji:'🍳', per100:{kcal:185,p:12,c:2,f:14,na:400,k:130}},
   {name:'Яичница', emoji:'🍳', per100:{kcal:196,p:13,c:1,f:15,na:300,k:130}},
   {name:'Творог 0%', emoji:'🧀', per100:{kcal:71,p:16,c:1.8,f:0.2,na:44,k:117}},
-  {name:'Творог 9%', emoji:'��', per100:{kcal:159,p:16,c:2,f:9,na:41,k:112}},
+  {name:'Творог 9%', emoji:'🧀', per100:{kcal:159,p:16,c:2,f:9,na:41,k:112}},
   {name:'Сырники', emoji:'🥞', per100:{kcal:220,p:15,c:18,f:10,na:250,k:150}},
   {name:'Сметана 15%', emoji:'🥛', per100:{kcal:158,p:2.6,c:3,f:15,na:40,k:116}},
   {name:'Кефир 1%', emoji:'🥛', per100:{kcal:40,p:3,c:4,f:1,na:50,k:150}},
@@ -1259,7 +1262,7 @@ const FOOD_DB = [
   {name:'Киноа отварная', emoji:'🍚', per100:{kcal:120,p:4.4,c:21,f:1.9,na:7,k:172}},
   {name:'Перловка отварная', emoji:'🍚', per100:{kcal:109,p:3.1,c:22,f:0.4,na:3,k:75}},
   {name:'Пшённая каша', emoji:'🍚', per100:{kcal:90,p:3,c:17,f:0.8,na:4,k:80}},
-  {name:'Кускус от��арно����', emoji:'🍚', per100:{kcal:112,p:3.8,c:23,f:0.2,na:5,k:58}},
+  {name:'Кускус отварной', emoji:'🍚', per100:{kcal:112,p:3.8,c:23,f:0.2,na:5,k:58}},
   {name:'Рис бурый отварной', emoji:'🍚', per100:{kcal:110,p:2.6,c:23,f:0.9,na:5,k:43}},
   {name:'Чечевица отварная', emoji:'🫘', per100:{kcal:116,p:9,c:20,f:0.4,na:2,k:370}},
   {name:'Нут отварной', emoji:'🫘', per100:{kcal:164,p:9,c:27,f:2.6,na:7,k:290}},
@@ -1283,7 +1286,7 @@ const FOOD_DB = [
   /* овощи и зелень */
   {name:'Помидор', emoji:'🍅', per100:{kcal:18,p:0.9,c:3.9,f:0.2,na:5,k:237}},
   {name:'Огурец свежий', emoji:'🥒', per100:{kcal:15,p:0.7,c:3.6,f:0.1,na:2,k:147}},
-  {name:'П��рец болгарский', emoji:'🫑', per100:{kcal:27,p:1,c:6,f:0.3,na:4,k:210}},
+  {name:'Перец болгарский', emoji:'🫑', per100:{kcal:27,p:1,c:6,f:0.3,na:4,k:210}},
   {name:'Морковь', emoji:'🥕', per100:{kcal:41,p:0.9,c:10,f:0.2,na:69,k:320}},
   {name:'Свёкла варёная', emoji:'🫑', per100:{kcal:44,p:1.7,c:10,f:0.2,na:77,k:305}},
   {name:'Капуста белокочанная', emoji:'🥬', per100:{kcal:25,p:1.3,c:6,f:0.1,na:18,k:170}},
@@ -1332,7 +1335,7 @@ const FOOD_DB = [
   {name:'Пастила', emoji:'🍬', per100:{kcal:310,p:0.5,c:80,f:0.1,na:25,k:55}},
   {name:'Мороженое пломбир', emoji:'🍦', per100:{kcal:227,p:3.7,c:20,f:15,na:50,k:160}},
   {name:'Торт бисквитный', emoji:'🍰', per100:{kcal:350,p:5,c:50,f:15,na:250,k:100}},
-  {name:'Пончик', emoji:'🍩', per100:{kcal:421,p:6,c:45,f:24,na:340,k:110}},
+  {name:'П��нчик', emoji:'🍩', per100:{kcal:421,p:6,c:45,f:24,na:340,k:110}},
   {name:'Вафли', emoji:'🧇', per100:{kcal:425,p:8,c:65,f:15,na:300,k:120}},
   {name:'Шоколад тёмный 70%', emoji:'🍫', per100:{kcal:598,p:7.8,c:46,f:43,na:20,k:715}},
   {name:'Сникерс', emoji:'🍫', per100:{kcal:488,p:9,c:60,f:24,na:230,k:340}},
@@ -1344,7 +1347,7 @@ const FOOD_DB = [
   {name:'Шаурма', emoji:'🌯', per100:{kcal:250,p:12,c:22,f:13,na:550,k:230}},
   {name:'Наггетсы', emoji:'🍗', per100:{kcal:296,p:15,c:16,f:19,na:540,k:250}},
   {name:'Хот-дог', emoji:'🌭', per100:{kcal:290,p:10,c:24,f:17,na:800,k:150}},
-  {name:'Роллы (Филадельф��я)', emoji:'🍣', per100:{kcal:180,p:8,c:24,f:6,na:450,k:120}},
+  {name:'Роллы (Филадельфия)', emoji:'🍣', per100:{kcal:180,p:8,c:24,f:6,na:450,k:120}},
   {name:'Пирожок жареный', emoji:'🥟', per100:{kcal:290,p:6,c:38,f:13,na:350,k:120}},
   {name:'Борщ', emoji:'🍲', per100:{kcal:49,p:1.6,c:5.5,f:2.3,na:350,k:200}},
   {name:'Суп куриный с лапшой', emoji:'🍲', per100:{kcal:55,p:3.5,c:6,f:2,na:340,k:80}},
@@ -1411,7 +1414,7 @@ const FOOD_DB = [
   {name:'Морковь по-корейски', emoji:'🥕', per100:{kcal:113,p:1.2,c:9,f:8,na:480,k:180}},
   {name:'Кабачковая икра', emoji:'🥫', per100:{kcal:97,p:1.2,c:7,f:7,na:500,k:240}},
   {name:'Лечо', emoji:'🥫', per100:{kcal:60,p:1,c:8,f:2.5,na:400,k:180}},
-  {name:'Чеснок', emoji:'���', per100:{kcal:143,p:6.5,c:30,f:0.5,na:17,k:400}},
+  {name:'Чеснок', emoji:'🧄', per100:{kcal:143,p:6.5,c:30,f:0.5,na:17,k:400}},
   {name:'Вешенки жареные', emoji:'🍄', per100:{kcal:60,p:3,c:4.5,f:3.5,na:15,k:260}},
   {name:'Томатная паста', emoji:'🥫', per100:{kcal:82,p:4.3,c:17,f:0.5,na:60,k:880}},
   /* фрукты, ягоды */
@@ -1531,7 +1534,7 @@ async function searchOpenFoodFacts(query){
 }
 async function lookupBarcodeOFF(code){
   const url = 'https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_ru,brands,nutriments,status';
-  /* сервер OFF часто не отвеча��т и��и отвечает с ошибкой с первого раза — как и в текстовом
+  /* сервер OFF часто не отвечает или отвечает с ошибкой с первого раза — как и в текстовом
      поиске, даём ещё 2 попытки с растущим таймаутом, прежде чем считать, что продукта нет */
   let lastErr = null;
   for(const ms of [6000, 9000, 12000]){
@@ -1582,7 +1585,7 @@ async function loadPublicFoods(){
 async function publishFood(food){
   if(!publicDbReady()) return false;
   /* Клиентская валидация + троттлинг. ВНИМАНИЕ: это НЕ защита — anon-ключ виден в клиенте.
-     Реальную защиту от мусора должны обеспечивать RLS-политика и валидация в edge-функции на сервере. */
+     Реальн��ю защиту от мусора должны обеспечивать RLS-политика и валидация в edge-функции на сервере. */
   const name = String(food.name||'').trim();
   const per = food.per100 || {};
   const numOk = (x, max)=> x==null || (typeof x==='number' && isFinite(x) && x>=0 && x<=max);
@@ -1613,8 +1616,8 @@ function tdee(p){ return bmr(p) * (ACTIVITY_MULT[p.activity] || 1.375); }
 /* дефицит в процентах от нормы */
 const GOAL_PCT = { maintain:0, slow:0.10, moderate:0.20, fast:0.28 };
 /* ручной режим: норма КБЖУ задана в настройках — тогда всё, что зависит от нормы
-   (кольцо, остаток, белок, календарь, аналитика, графики, ��рогноз и советы)
-   считается от его чисел, а не от фор��улы */
+   (кольцо, остаток, белок, календарь, аналитика, графики, прогноз и советы)
+   считается от его чисел, а не от формулы */
 function customOn(p){ return !!(p && p.custom && p.custom.on && p.custom.kcal > 0); }
 function goalRateKgWeek(p){
   if(customOn(p)) return Math.round((tdee(p) - goalCalories(p))*7/7700*20)/20;
@@ -2135,6 +2138,9 @@ function renderMain(){
       G.mode = Math.abs(dx) > Math.abs(dy)*1.15 ? 'h' : 'v';
       if(G.mode==='h'){
         G.dir = dx < 0 ? 1 : -1;
+        /* свайп ВПРАВО больше не переключает раздел — он конфликтовал
+           с системным жестом «назад» в Telegram */
+        if(G.dir===-1){ G.skip = true; G.mode = null; return; }
         const j = ORDER.indexOf(ui.tab) + G.dir;
         G.edge = !(j>=0 && j<ORDER.length);
         mc.style.transition = 'none';
@@ -2255,7 +2261,7 @@ function renderHome(){
             <div class="ring-kcal-unit">ккал</div>
           </div>
         </div>
-        ${burned>0?`<div class="ring-burn">+ ${burned} ккал сожжено активностью · уже учтено в норме</div>`:''}
+        ${burned>0?`<div class="ring-burn">+ ${burned} ккал сожжено активностью</div>`:''}
         <div class="ring-sub">Для снижения веса на ~${rateWeek||0} кг в неделю</div>
       </div>
 
@@ -2323,7 +2329,7 @@ function getSmartAdvice(){
     return `К вечеру выпито только ${(water/1000).toFixed(1)} л из ${(norm/1000).toFixed(1)} л. Равномерно добери норму, но не заливай всё перед сном`;
   const steps3 = lastDays(3).reduce((s,x)=>s+daySteps(x),0)/3;
   if(steps3 < 4000)
-    return `Шагов в последние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
+    return `Шагов в после��ние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
   const si = streakInfo();
   return `Ты на верном пути${si.display>1?` — уже ${si.display}-й день подряд`:''}. Держи белок около ${targetProtein} г, соль до ${SALT_LIMIT} г и не пропускай шаги`;
 }
@@ -2350,7 +2356,7 @@ function showGoalOverlay(w){
   ov.id = 'goalOverlay';
   ov.innerHTML = `${conf}
     <div class="goal-emoji">🏆</div>
-    <div class="goal-big">Ц��ль достигнута!</div>
+    <div class="goal-big">Цель достигнута!</div>
     <div class="goal-sub">${w.toFixed(1)} кг — целевой вес взят.<br>Огромная работа. Горжусь!</div>
     <button class="btn-primary" style="max-width:260px;margin-top:26px" data-act="closeGoal">Продолжить</button>`;
   document.body.appendChild(ov);
@@ -2370,8 +2376,8 @@ function edemaHtml(){
   const na = dayNa(ds), k = dayK(ds);
   const kNa = na>0 ? k/na : (k>0 ? 99 : 0);
   let ratioState, ratioLabel, ratioNote;
-  if(!hasNk){ ratioState='mid'; ratioLabel='—'; ratioNote='Пока нет данных о натрии и калии — добавь продукты из базы, и я рассчитаю баланс'; }
-  else if(kNa >= 4){ ratioState='good'; ratioLabel='Идеальный'; ratioNote='Калия в 4���5 раз больше натрия — идеальный баланс, лишняя вода не задерживается'; }
+  if(!hasNk){ ratioState='mid'; ratioLabel='—'; ratioNote=''; }
+  else if(kNa >= 4){ ratioState='good'; ratioLabel='Идеальный'; ratioNote='Калия в 4–5 раз больше натрия — идеальный баланс, лишняя вода не задерживается'; }
   else if(kNa >= 2){ ratioState='mid'; ratioLabel='В норме'; ratioNote='Калия в 2–3 раза больше натрия — неплохо, но до идеала (4–5 к 1) добавь бананы, авокадо, шпинат, зелень или выпей добавку'; }
   else { ratioState='bad'; ratioLabel='Мало'; ratioNote='Калия слишком мало по отношению к натрию — это задерживает воду. Добавь картофель, бананы, авокадо, шпинат или курагу'; }
   const covNote = cov==='partial' ? '<div class="metric-note" style="margin-top:6px;opacity:.8">У части продуктов сегодня нет данных о натрии/калии — показаны только те, где данные есть</div>' : '';
@@ -2465,7 +2471,7 @@ ACTIONS.toggleGlass = (arg)=>{
 ACTIONS.edemaToActivity = ()=>{ closeSheet(); ui.tab='activity'; renderTab(); };
 ACTIONS.infoSalt = ()=> openModal(`
   <div class="modal-title">Соль и отёки</div>
-  <div class="modal-text">Чтобы не допускать задержку жидкости, ешь не более 4.5 г соли �� день</div>
+  <div class="modal-text">Чтобы не допускать задержку жидкости, ешь не более 4.5 г соли (1770 мг натрия) в день</div>
   <div class="modal-text">Не добавляй соль в еду, <b>сократи</b> или <b>исключи</b> хлеб, чипсы, соусы, полуфабрикаты, сыр, фастфуд, колбасы, сосиски и подобное</div>
   <div class="modal-text">Идеальное соотношение калия к натрию – 4-5 к 1 (в пользу калия). <b>Источники калия:</b> бананы, авокадо, шпинат, картофель, бобовые, курага, орехи</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
@@ -2556,7 +2562,7 @@ function workoutsHtml(){
   const ds = logDs();
   const list = S.workoutLog[ds] || [];
   return `
-    <div class="sheet-title">Тренировки${editDs? ' · '+fmtDate(editDs) : ''}</div>
+    <div class="sheet-title">Т��енировки${editDs? ' · '+fmtDate(editDs) : ''}</div>
     ${list.length
       ? list.map((w,i)=>workoutItemHtml(w,i)).join('')
       : `<div class="empty-mid">${editDs? 'В этот день тренировок не записано' : 'Сегодня тренировок ещё не было'}</div>`}
@@ -2568,7 +2574,7 @@ function workoutsHtml(){
 ACTIONS.openWorkouts = ()=> openSheet(workoutsHtml());
 ACTIONS.backToDay = ()=>{ if(editDs) openSheet(dayEditorHtml(editDs)); };
 
-/* Виды активности. MET на 4 уровня тяжести; perKm — точный расчёт по дистанц��и */
+/* Виды активности. MET на 4 уровня тяжести; perKm — точный расчёт по дистанции */
 const ACTS = [
   {k:'strength', e:'🏋️', n:'Силовая тренировка', met:[3.5,5,6,7.5]},
   {k:'run', e:'🏃', n:'Бег', met:[7,8.5,10.5,12.5], dist:true, perKm:1.03},
@@ -2582,11 +2588,13 @@ const ACTS = [
   {k:'cardio', e:'❤️', n:'Кардио', met:[4.5,6,8,10], dist:true, perKm:0.85},
   {k:'other', e:'✏️', n:'Другое', met:[3.5,5,6.5,8]},
 ];
-const EFFORTS = [ {e:'😌',n:'Легко'}, {e:'🙂',n:'Умеренно'}, {e:'😤',n:'Тяжело'}, {e:'🥵',n:'Очень тя��ело'} ];
+const EFFORTS = [ {e:'😌',n:'Легко'}, {e:'🙂',n:'Умеренно'}, {e:'😤',n:'Тяжело'}, {e:'🥵',n:'Очень тяжело'} ];
+/* solo-групп больше нет: раньше выбор «Всё тело/Верх/Низ» сбрасывал остальные
+   отметки и набрать несколько групп был�� невозможно */
 const MUSCLE_ZONES = [
-  {n:'Всё тело', f:1.15, solo:true},
-  {n:'Верх', f:1.0, solo:true},
-  {n:'Низ', f:1.1, solo:true},
+  {n:'Всё тело', f:1.15},
+  {n:'Верх', f:1.0},
+  {n:'Низ', f:1.1},
   {n:'Грудь', f:0.95},
   {n:'Спина', f:1.05},
   {n:'Ноги', f:1.1},
@@ -2694,14 +2702,11 @@ function bindWorkoutForm(){
     b.classList.add('active'); wDraft.eff = parseInt(b.dataset.e); haptic('light'); syncWorkoutSteps();
   };});
   document.querySelectorAll('#wqMuscles .pill').forEach(p=>{ p.onclick = ()=>{
-    const i = parseInt(p.dataset.m); const zone = MUSCLE_ZONES[i];
+    const i = parseInt(p.dataset.m);
     const pos = wDraft.muscles.indexOf(i);
-    if(pos>=0){ wDraft.muscles.splice(pos,1); }
-    else {
-      if(zone.solo) wDraft.muscles = [];
-      else wDraft.muscles = wDraft.muscles.filter(x=>!MUSCLE_ZONES[x].solo);
-      wDraft.muscles.push(i);
-    }
+    /* любое количество групп: простое вкл/выкл без взаимоисключения */
+    if(pos>=0) wDraft.muscles.splice(pos,1);
+    else wDraft.muscles.push(i);
     document.querySelectorAll('#wqMuscles .pill').forEach((x,xi)=>x.classList.toggle('active', wDraft.muscles.includes(xi)));
     haptic('light'); syncWorkoutSteps();
   };});
@@ -2940,7 +2945,7 @@ function renderFoodTabBody(){
       </div>
       <div class="scan-status" id="scanStatus">Наведи камеру на штрихкод упаковки</div>
       <div class="manual-barcode-row">
-        <input class="plain-input" id="manualCode" type="number" inputmode="numeric" placeholder="Ил�� введи код вручную">
+        <input class="plain-input" id="manualCode" type="number" inputmode="numeric" placeholder="Или введи код вручную">
         <button class="btn-secondary" style="width:auto;padding:0 18px" data-act="manualBarcode">OK</button>
       </div>
       <div id="scanResult"></div>`;
@@ -3084,7 +3089,7 @@ ACTIONS.saveCustomFood = ()=>{
       showToast('Сохранено! Отправляем в общую базу…');
       publishFood(food).then(ok=> showToast(ok? 'Продукт опубликован для всех' : 'Не удалось опубликовать — продукт сохранён локально'));
     } else {
-      showToast('Общая база не ��одключена — продукт сохранён локально');
+      showToast('Общая база не подключена — продукт сохранён локально');
     }
   } else {
     showToast('Сохранено в «Своё блюдо»');
@@ -3133,7 +3138,7 @@ function addPickedToLog(grams){
     item = { name:f.name, emoji:f.emoji||'🍽', time:nowTime(), grams:Math.round(grams),
       kcal:Math.round(per.kcal*m), p:r1(per.p*m), c:r1(per.c*m), f:r1(per.f*m),
       na: per.na!=null? Math.round(per.na*m) : null, k: per.k!=null? Math.round(per.k*m) : null,
-      /* храним базу на 100 г — правки граммовки пересчитываются от неё, без накопления ошиб��и округления */
+      /* храним базу на 100 г — правки граммовки пересчитываются от неё, без накопления о��ибки округления */
       per100: { kcal:per.kcal, p:per.p, c:per.c, f:per.f, na:per.na!=null?per.na:null, k:per.k!=null?per.k:null } };
   } else {
     const x = f.fixed || f;
@@ -3396,12 +3401,12 @@ function renderStatsTab(){
         <div class="chart-holder">${weightChartSvg(w30.length>=2? w30 : wAll, slope)}</div>
       </div>
 
-      <div class="section-title">Календарь сушки</div>
+      <div class="section-title">Кален��арь сушки</div>
       <div class="card rise" style="animation-delay:.2s">
         <div class="calendar-grid">${cal}</div>
         <div class="cal-legend"><span><i class="cal-dot ok"></i>в норме</span><span><i class="cal-dot warn"></i>отклонение</span><span><i class="cal-dot bad"></i>перебор</span><span><i class="cal-dot frozen"></i>заморозка</span></div>
       </div>
-      ${si.display>0?`<div class="advice-card rise" style="animation-delay:.22s"><div class="advice-head"><span class="advice-dot"></span>Стрик</div><div class="advice-text">${si.display}-й день подряд. Доступно 3 заморозки в месяц, так что пр��пущенный день не сломает огонёк</div></div>`:''}
+      ${si.display>0?`<div class="advice-card rise" style="animation-delay:.22s"><div class="advice-head"><span class="advice-dot"></span>Стрик</div><div class="advice-text">${si.display}-й день подряд. Доступно 3 заморозки в месяц, так что пропущенный день не сломает огонёк</div></div>`:''}
     </div>`;
 }
 TABS.stats = { html: renderStatsTab };
@@ -3472,18 +3477,7 @@ function renderSettingsTab(){
     const mt = macroTargets(p);
     const cK = Math.round(c.kcal || goalCalories(p)), cP = Math.round(c.p>0?c.p:mt.protein), cF = Math.round(c.f>0?c.f:mt.fat), cC = Math.round(c.c>0?c.c:mt.carbs);
     body = `
-      <div class="goal-banner"><div class="goal-banner-num">${goalCalories(p)}</div><div class="goal-banner-lbl">ккал — твоя дневная норма${man?' · задана вручную':''}</div></div>
-      <div class="card">
-        <div class="theme-toggle-row" data-act="toggleCustomKbju"><div>Свои КБЖУ</div><div class="switch ${man?'on':''}"><div class="knob"></div></div></div>
-        <div class="settings-hint" style="margin:6px 2px ${man?'14px':'0'}">Задать норму на день самому вместо расчёта по формуле</div>
-        ${man?`
-        <div class="field-row"><div class="field-row-lbl">Калории, ккал</div><input class="field-row-input" id="cKcal" type="number" inputmode="numeric" value="${cK}"></div>
-        <div class="field-row"><div class="field-row-lbl">Белки, г</div><input class="field-row-input" id="cP" type="number" inputmode="numeric" value="${cP}"></div>
-        <div class="field-row"><div class="field-row-lbl">Жиры, г</div><input class="field-row-input" id="cF" type="number" inputmode="numeric" value="${cF}"></div>
-        <div class="field-row"><div class="field-row-lbl">Углеводы, г</div><input class="field-row-input" id="cC" type="number" inputmode="numeric" value="${cC}"></div>
-        <div class="settings-hint" style="margin:10px 2px 0">По БЖУ выходит ${Math.round(cP*4 + cC*4 + cF*9)} ккал. Кольцо, остаток на день, календарь, аналитика, графики, прогноз и советы считаются от этих цифр</div>
-        <button class="data-btn" style="margin-top:12px" data-act="fillKbjuFromFormula">Подставить расчёт по формуле<span class="data-btn-sub">по твоему весу, активности и цели</span></button>`:''}
-      </div>
+      <div class="goal-banner pressable" data-act="editNorm" style="cursor:pointer"><div class="goal-banner-num">${goalCalories(p)}</div><div class="goal-banner-lbl">ккал — твоя дневная норма${man?' · задана вручную':''}</div><div class="goal-banner-lbl" style="opacity:.7;margin-top:6px">Нажми, чтобы изменить КБЖУ</div></div>
       <div class="goal-list" style="margin-top:14px${man?';opacity:.5':''}">
         ${goals.map(([k,l,kc])=>`<div class="goal-card pressable ${p.goal===k?'active':''}" data-act="setGoal" data-arg="${k}"><div class="goal-left"><div class="goal-radio"></div><div class="goal-name">${l}</div></div><div class="goal-kcal">${Math.round(kc)}</div></div>`).join('')}
       </div>
@@ -3513,7 +3507,7 @@ function renderSettingsTab(){
         <button class="data-btn" data-act="openImport"><span class="data-btn-ic">${ic('history')}</span>Импорт истории сушки<span class="data-btn-sub">восстановит стрик, графики и статистику</span></button>
         <button class="data-btn" data-act="exportData"><span class="data-btn-ic">${ic('download')}</span>Экспорт / резервная копия<span class="data-btn-sub">все данные одним файлом</span></button>
         <button class="data-btn" data-act="openRestore"><span class="data-btn-ic">${ic('restore')}</span>Восстановить из копии<span class="data-btn-sub">вставь сохранённый текст копии</span></button>
-        <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>��бросить всё<span class="data-btn-sub">удалить профиль и историю</span></button>
+        <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>Сбросить всё<span class="data-btn-sub">удалить профиль и историю</span></button>
       </div>`;
   }
   return `
@@ -3538,13 +3532,7 @@ function bindSettings(){
     }
   });
   num('sTarget', v=>{ if(v>=30 && v<=300){ S.profile.targetWeight = r1(v); checkGoalReached(); } });
-  /* ручные КБЖУ */
-  /* {on:true} должен идти ПОСЛЕДНИМ: иначе старое on:false из custom его перебивало */
-  const setC = (patch)=>{ S.profile.custom = Object.assign({}, S.profile.custom||{}, patch, {on:true}); };
-  num('cKcal', v=>{ setC({ kcal: Math.max(600, Math.min(8000, Math.round(v))) }); });
-  num('cP', v=>{ setC({ p: Math.max(0, Math.min(600, Math.round(v))) }); });
-  num('cF', v=>{ setC({ f: Math.max(0, Math.min(400, Math.round(v))) }); });
-  num('cC', v=>{ setC({ c: Math.max(0, Math.min(900, Math.round(v))) }); });
+  /* ручные КБЖУ теперь редактируются в окне «Дневная норма» (ACTIONS.editNorm) */
 }
 TABS.settings = { html: renderSettingsTab, bind: bindSettings };
 ACTIONS.settingsTab = (arg)=>{ ui.settingsTab = arg; renderTab(); };
@@ -3560,22 +3548,33 @@ ACTIONS.infoActivity = ()=> openModal(`
     Коэффициент умножается на базовый обмен по формуле Миффлина-Сан Жеора — так считается твоя дневная норма. Норма пересчитывается сразу после выбора. Выбирай честно: завышенный уровень замедлит сушку</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
 ACTIONS.setGoal = (arg)=>{ S.profile.goal = arg; save(); renderTab(); };
-ACTIONS.toggleCustomKbju = ()=>{
-  const p = S.profile, cur = p.custom || {};
-  if(cur.on){ p.custom = Object.assign({}, cur, {on:false}); showToast('Норма снова считается по формуле'); }
-  else{
-    const auto = autoMacroTargets(p);
-    p.custom = { on:true, kcal: cur.kcal || goalCalories(p), p: cur.p || auto.protein, f: cur.f || auto.fat, c: cur.c || auto.carbs };
-    showToast('Ручные КБЖУ включены — все расчёты идут от твоих цифр');
-  }
-  save(); renderTab();
+/* Редактор дневной нормы — одно окно вместо переключателя «Свои КБЖУ».
+   Сохранённые цифры живут в profile.custom с on:true — формула их никогда не перезапишет */
+ACTIONS.editNorm = ()=>{
+  const p = S.profile, c = p.custom || {}, mt = macroTargets(p);
+  const row = (id, lbl, val)=>`<div class="field-row"><div class="field-row-lbl">${lbl}</div><input class="field-row-input" id="${id}" type="number" inputmode="numeric" value="${val}"></div>`;
+  openModal(`
+    <div class="modal-title">Дневная норма</div>
+    <div class="card" style="margin-top:6px">
+      ${row('nKcal','Калории, ккал', Math.round(c.kcal>0?c.kcal:goalCalories(p)))}
+      ${row('nP','Белки, г', Math.round(c.p>0?c.p:mt.protein))}
+      ${row('nF','Жиры, г', Math.round(c.f>0?c.f:mt.fat))}
+      ${row('nC','Углеводы, г', Math.round(c.c>0?c.c:mt.carbs))}
+    </div>
+    <button class="btn-primary" style="margin-top:14px" data-act="saveNorm">Сохранить</button>
+    <button class="btn-secondary" style="margin-top:8px" data-act="resetNorm">Рассчитать по формуле</button>`);
 };
-ACTIONS.fillKbjuFromFormula = ()=>{
-  const p = S.profile, keep = p.custom;
-  p.custom = null; /* на мгновение считаем чистой формулой */
-  const kcal = goalCalories(p), auto = autoMacroTargets(p);
-  p.custom = { on:true, kcal, p:auto.protein, f:auto.fat, c:auto.carbs };
-  save(); renderTab(); showToast('Подставлен расчёт по формуле: ' + kcal + ' ккал');
+ACTIONS.saveNorm = ()=>{
+  const g = id=>{ const el = document.getElementById(id); return Math.round(parseFloat(String(el ? el.value : '').replace(',','.'))); };
+  const kcal = g('nKcal'), pr = g('nP'), ff = g('nF'), cc = g('nC');
+  if(!(kcal>=600 && kcal<=8000)){ showToast('Калории: от 600 до 8000'); return; }
+  if(![pr,ff,cc].every(v=> v>=0 && v<=900)){ showToast('Проверь БЖУ'); return; }
+  S.profile.custom = { on:true, kcal:kcal, p:pr, f:ff, c:cc };
+  save(true); closeModal(); renderTab(); haptic('ok'); showToast('Норма сохранена');
+};
+ACTIONS.resetNorm = ()=>{
+  S.profile.custom = { on:false };
+  save(true); closeModal(); renderTab(); showToast('Норма считается по формуле');
 };
 ACTIONS.toggleDark = ()=>{ S.theme.dark = !isDark(); save(); applyTheme(); renderTab(); };
 ACTIONS.setAccent = (arg)=>{ S.theme.accent = arg; save(); applyTheme(); renderTab(); };
@@ -3585,7 +3584,7 @@ ACTIONS.setAccent = (arg)=>{ S.theme.accent = arg; save(); applyTheme(); renderT
 ACTIONS.openImport = ()=>{
   openSheet(`
     <div class="sheet-title">Импорт истории сушки</div>
-    <div class="modal-text">Уже какое-то время на сушке? Добавь прошлые дни — приложение восстановит стрик, графики, средний дефицит и прогноз. Обязательны только калории; вес и БЖУ — по желанию, с ними статистика будет детальнее</div>
+    <div class="modal-text">Уже какое-то время на сушке? Добавь прошлые дни — прило��ение восстановит стрик, графики, средний дефицит и прогноз. Обязательны только калории; вес и БЖУ — по желанию, с ними статистика будет детальнее</div>
     <div class="actions-grid" style="margin-top:14px">
       <button class="btn-primary" data-act="importByDays">Заполнить по дням</button>
       <button class="btn-secondary" data-act="importByText">Вставить текстом (хоть 200 дней)</button>
