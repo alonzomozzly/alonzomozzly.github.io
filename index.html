@@ -586,7 +586,7 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 "use strict";
 
 /* ================= Telegram + среда ================= */
-/* реальный Telegram определяем по документ��рованному WebApp.platform (не по несуществующему initDataUnavailable) */
+/* реальный Telegram определяем по документрованному WebApp.platform (не по несуществующему initDataUnavailable) */
 const _WA = window.Telegram && window.Telegram.WebApp;
 const tg = (_WA && _WA.platform && _WA.platform !== 'unknown') ? _WA : null;
 let cloudOK = false;
@@ -1155,7 +1155,7 @@ function renderLock(expired){
 }
 function gateJoinChannel(){
   if(ACCESS_LINK){ if(tg && tg.openTelegramLink) tg.openTelegramLink(ACCESS_LINK); else window.open(ACCESS_LINK, '_blank'); return; }
-  /* ссылка на покупку ещё не настроена — возвращ��ем пользователя в чат с ботом, где он оформит доступ, вместо тупика */
+  /* ссылка на покупку ещё не настроена — возвращем пользователя в чат с ботом, где он оформит доступ, вместо тупика */
   showToast('Открой чат с ботом, чтобы оформить доступ');
   if(tg && tg.close) setTimeout(()=>{ try{ tg.close(); }catch(e){} }, 900);
 };
@@ -1163,7 +1163,7 @@ async function gateRecheckAccess(){
   showToast('Проверяем…');
   const a = await checkAccess();
   if(a && a.access!=='expired') location.reload();
-  else showToast('Подписка не найден�� — оформи доступ и попробуй снова');
+  else showToast('Подписка не найдена — оформи доступ и попробуй снова');
 };
 let editDs = null; /* дата, для которой редактируется питание (null = сегодня) */
 function logDs(){ return editDs || todayStr(); }
@@ -1335,7 +1335,7 @@ const FOOD_DB = [
   {name:'Пастила', emoji:'🍬', per100:{kcal:310,p:0.5,c:80,f:0.1,na:25,k:55}},
   {name:'Мороженое пломбир', emoji:'🍦', per100:{kcal:227,p:3.7,c:20,f:15,na:50,k:160}},
   {name:'Торт бисквитный', emoji:'🍰', per100:{kcal:350,p:5,c:50,f:15,na:250,k:100}},
-  {name:'П��нчик', emoji:'🍩', per100:{kcal:421,p:6,c:45,f:24,na:340,k:110}},
+  {name:'Пнчик', emoji:'🍩', per100:{kcal:421,p:6,c:45,f:24,na:340,k:110}},
   {name:'Вафли', emoji:'🧇', per100:{kcal:425,p:8,c:65,f:15,na:300,k:120}},
   {name:'Шоколад тёмный 70%', emoji:'🍫', per100:{kcal:598,p:7.8,c:46,f:43,na:20,k:715}},
   {name:'Сникерс', emoji:'🍫', per100:{kcal:488,p:9,c:60,f:24,na:230,k:340}},
@@ -1487,26 +1487,295 @@ const FOOD_DB = [
   {name:'Морс ягодный', emoji:'🧃', per100:{kcal:45,p:0.1,c:11,f:0,na:5,k:40}},
   {name:'Квас', emoji:'🥤', per100:{kcal:27,p:0.2,c:5.2,f:0,na:10,k:20}},
   {name:'Сок яблочный', emoji:'🧃', per100:{kcal:46,p:0.1,c:11,f:0.1,na:4,k:101}},
-  {name:'Протеин сывороточный (порошок)', emoji:'🥤', per100:{kcal:380,p:75,c:8,f:5,na:200,k:500}},
+  {name:'Протеин сывороточный (порошок)', emoji:'🥤', per100:{kcal:380,p:75,c:8,f:5,na:200,k:500}},  /* ---- мясо, рыба, яйца ---- */
+  {name:'Куриная грудка сырая (филе)', emoji:'🍗', per100:{kcal:113,p:23.6,c:0.4,f:1.9,na:60,k:292}},
+  {name:'Куриная грудка гриль', emoji:'🍗', per100:{kcal:158,p:29,c:0,f:4,na:290,k:330}},
+  {name:'Куриное бедро без кожи', emoji:'🍗', per100:{kcal:185,p:21,c:0,f:11,na:85,k:230}},
+  {name:'Куриное крыло', emoji:'🍗', per100:{kcal:186,p:19,c:0,f:12,na:82,k:190}},
+  {name:'Куриный фарш', emoji:'🍖', per100:{kcal:143,p:20,c:0,f:7,na:70,k:250}},
+  {name:'Индейка (филе грудки)', emoji:'🦃', per100:{kcal:104,p:24,c:0,f:1,na:55,k:300}},
+  {name:'Индейка (бедро)', emoji:'🦃', per100:{kcal:144,p:19,c:0,f:7,na:70,k:250}},
+  {name:'Свинина (ошеек)', emoji:'🥩', per100:{kcal:267,p:16,c:0,f:22,na:60,k:270}},
+  {name:'Свинина (карбонад, постная)', emoji:'🥩', per100:{kcal:142,p:21,c:0,f:6,na:55,k:330}},
+  {name:'Говяжий фарш', emoji:'🥩', per100:{kcal:254,p:17,c:0,f:20,na:66,k:270}},
+  {name:'Стейк говяжий (рибай)', emoji:'🥩', per100:{kcal:291,p:24,c:0,f:21,na:60,k:315}},
+  {name:'Телятина', emoji:'🥩', per100:{kcal:131,p:21,c:0,f:5,na:80,k:320}},
+  {name:'Баранина', emoji:'🥩', per100:{kcal:209,p:16,c:0,f:16,na:65,k:270}},
+  {name:'Кролик', emoji:'🥩', per100:{kcal:156,p:21,c:0,f:8,na:57,k:335}},
+  {name:'Печень куриная', emoji:'🫀', per100:{kcal:137,p:20,c:0.7,f:6,na:90,k:290}},
+  {name:'Печень говяжья', emoji:'🫀', per100:{kcal:127,p:20,c:4,f:3.6,na:104,k:277}},
+  {name:'Сердце куриное', emoji:'🫀', per100:{kcal:158,p:16,c:1,f:10,na:75,k:176}},
+  {name:'Лосось (семга)', emoji:'🐟', per100:{kcal:208,p:20,c:0,f:13,na:59,k:363}},
+  {name:'Лосось слабосолёный', emoji:'🐟', per100:{kcal:202,p:22,c:0,f:12,na:1200,k:340}},
+  {name:'Горбуша', emoji:'🐟', per100:{kcal:142,p:21,c:0,f:6,na:70,k:335}},
+  {name:'Форель', emoji:'🐟', per100:{kcal:141,p:20,c:0,f:6,na:52,k:361}},
+  {name:'Треска', emoji:'🐟', per100:{kcal:82,p:18,c:0,f:0.7,na:78,k:413}},
+  {name:'Минтай', emoji:'🐟', per100:{kcal:72,p:16,c:0,f:0.9,na:100,k:420}},
+  {name:'Сельдь солёная', emoji:'🐟', per100:{kcal:217,p:19,c:0,f:15,na:1500,k:180}},
+  {name:'Тунец в собственном соку', emoji:'🐟', per100:{kcal:96,p:22,c:0,f:0.6,na:320,k:230}},
+  {name:'Креветки варёные', emoji:'🍤', per100:{kcal:99,p:24,c:0.2,f:0.3,na:590,k:260}},
+  {name:'Кальмар', emoji:'🦑', per100:{kcal:92,p:16,c:3,f:1.4,na:44,k:246}},
+  {name:'Мидии', emoji:'🦪', per100:{kcal:86,p:12,c:3.7,f:2,na:286,k:320}},
+  {name:'Икра красная', emoji:'🍚', per100:{kcal:249,p:24,c:4,f:15,na:1500,k:180}},
+  {name:'Яйцо (1 шт, среднее)', emoji:'🥚', fixed:{kcal:70,p:6.3,c:0.4,f:5,na:62,k:63}},
+  {name:'Яичный белок (1 шт)', emoji:'🥚', fixed:{kcal:17,p:3.6,c:0.2,f:0.1,na:55,k:54}},
+  {name:'Яичница из 2 яиц', emoji:'🍳', fixed:{kcal:180,p:13,c:1,f:14,na:150,k:140}},
+  {name:'Омлет с молоком', emoji:'🍳', per100:{kcal:184,p:11,c:2.5,f:15,na:180,k:150}},
+  /* ---- колбасы и мясная гастрономия ---- */
+  {name:'Сосиски молочные', emoji:'🌭', per100:{kcal:266,p:11,c:2,f:24,na:900,k:200}},
+  {name:'Варёная колбаса (докторская)', emoji:'🥓', per100:{kcal:257,p:12,c:1.5,f:22,na:960,k:210}},
+  {name:'Сервелат', emoji:'🥓', per100:{kcal:461,p:24,c:0,f:40,na:1900,k:300}},
+  {name:'Бекон', emoji:'🥓', per100:{kcal:417,p:13,c:1.3,f:40,na:1700,k:200}},
+  {name:'Ветчина индейки', emoji:'🥓', per100:{kcal:104,p:17,c:2,f:3,na:1050,k:250}},
+  {name:'Карбонад копчёный', emoji:'🥓', per100:{kcal:220,p:18,c:0,f:16,na:1400,k:280}},
+  {name:'Куриная котлета (жареная)', emoji:'🍖', per100:{kcal:220,p:16,c:8,f:13,na:520,k:230}},
+  {name:'Шашлык из свинины', emoji:'🍢', per100:{kcal:280,p:20,c:1,f:22,na:600,k:300}},
+  {name:'Шашлык из курицы', emoji:'🍢', per100:{kcal:185,p:22,c:1,f:10,na:550,k:300}},
+  /* ---- крупы, гарниры, мука ---- */
+  {name:'Гречка сухая (крупа)', emoji:'🍛', per100:{kcal:343,p:13,c:62,f:3.4,na:11,k:460}},
+  {name:'Рис белый сухой', emoji:'🍚', per100:{kcal:344,p:6.7,c:78,f:0.7,na:5,k:100}},
+  {name:'Рис бурый отварной', emoji:'🍚', per100:{kcal:123,p:2.7,c:25,f:1,na:4,k:86}},
+  {name:'Булгур отварной', emoji:'🍚', per100:{kcal:83,p:3,c:19,f:0.2,na:5,k:68}},
+  {name:'Киноа отварная', emoji:'🍚', per100:{kcal:120,p:4.4,c:21,f:1.9,na:7,k:172}},
+  {name:'Перловка отварная', emoji:'🍛', per100:{kcal:109,p:3.1,c:23,f:0.4,na:3,k:78}},
+  {name:'Пшёнка отварная', emoji:'🍛', per100:{kcal:90,p:3,c:17,f:0.8,na:5,k:100}},
+  {name:'Кукурузная каша', emoji:'🍛', per100:{kcal:86,p:2,c:18,f:0.6,na:5,k:60}},
+  {name:'Манная каша на молоке', emoji:'🥣', per100:{kcal:98,p:3,c:15,f:2.5,na:50,k:110}},
+  {name:'Овсяная каша на молоке', emoji:'🥣', per100:{kcal:105,p:3.9,c:14,f:3.5,na:45,k:130}},
+  {name:'Кускус сухой', emoji:'🍚', per100:{kcal:376,p:13,c:72,f:0.6,na:10,k:166}},
+  {name:'Макароны сухие (твёрдые сорта)', emoji:'🍝', per100:{kcal:350,p:12,c:71,f:1.5,na:6,k:220}},
+  {name:'Паста болоньезе', emoji:'🍝', per100:{kcal:180,p:9,c:20,f:7,na:400,k:250}},
+  {name:'Паста карбонара', emoji:'🍝', per100:{kcal:265,p:11,c:24,f:14,na:520,k:180}},
+  {name:'Лаваш', emoji:'🫓', per100:{kcal:275,p:9,c:56,f:1.2,na:490,k:120}},
+  {name:'Тортилья пшеничная', emoji:'🫓', per100:{kcal:310,p:8,c:51,f:8,na:600,k:130}},
+  {name:'Хлеб белый (батон)', emoji:'🍞', per100:{kcal:262,p:8,c:50,f:3,na:490,k:120}},
+  {name:'Хлеб цельнозерновой', emoji:'🍞', per100:{kcal:230,p:10,c:39,f:3.5,na:420,k:250}},
+  {name:'Хлебцы ржаные', emoji:'🧇', per100:{kcal:310,p:11,c:58,f:3,na:400,k:400}},
+  {name:'Мука пшеничная', emoji:'🌾', per100:{kcal:342,p:10,c:70,f:1.1,na:2,k:122}},
+  {name:'Овсяная мука', emoji:'🌾', per100:{kcal:369,p:13,c:65,f:7,na:5,k:350}},
+  /* ---- молочное ---- */
+  {name:'Молоко 2.5%', emoji:'🥛', per100:{kcal:52,p:2.9,c:4.7,f:2.5,na:50,k:146}},
+  {name:'Молоко 3.2%', emoji:'🥛', per100:{kcal:59,p:2.9,c:4.7,f:3.2,na:50,k:146}},
+  {name:'Кефир 1%', emoji:'🥛', per100:{kcal:40,p:3,c:4,f:1,na:50,k:146}},
+  {name:'Ряженка 2.5%', emoji:'🥛', per100:{kcal:54,p:2.9,c:4.2,f:2.5,na:50,k:146}},
+  {name:'Сметана 15%', emoji:'🥛', per100:{kcal:162,p:2.6,c:3.6,f:15,na:35,k:120}},
+  {name:'Сливки 10%', emoji:'🥛', per100:{kcal:118,p:2.8,c:4,f:10,na:35,k:120}},
+  {name:'Творог обезжиренный', emoji:'🧀', per100:{kcal:71,p:16,c:1.3,f:0.6,na:41,k:117}},
+  {name:'Творожный сыр', emoji:'🧀', per100:{kcal:253,p:6,c:4,f:24,na:400,k:100}},
+  {name:'Сыр Российский', emoji:'🧀', per100:{kcal:363,p:23,c:0,f:30,na:820,k:88}},
+  {name:'Сыр Моцарелла', emoji:'🧀', per100:{kcal:280,p:22,c:2.2,f:20,na:600,k:76}},
+  {name:'Сыр Фета', emoji:'🧀', per100:{kcal:264,p:14,c:4,f:21,na:1100,k:62}},
+  {name:'Сыр Пармезан', emoji:'🧀', per100:{kcal:392,p:35,c:3.2,f:25,na:1600,k:92}},
+  {name:'Сыр Адыгейский', emoji:'🧀', per100:{kcal:240,p:19,c:1.5,f:18,na:450,k:80}},
+  {name:'Масло сливочное 82%', emoji:'🧈', per100:{kcal:748,p:0.5,c:0.8,f:82,na:15,k:15}},
+  {name:'Мороженое сливочное', emoji:'🍨', per100:{kcal:207,p:3.5,c:24,f:11,na:80,k:190}},
+  {name:'Сырники творожные', emoji:'🥞', per100:{kcal:220,p:14,c:22,f:9,na:200,k:150}},
+  {name:'Глазированный сырок', emoji:'🍫', per100:{kcal:407,p:8,c:32,f:27,na:150,k:120}},
+  /* ---- овощи, фрукты, орехи ---- */
+  {name:'Картофель отварной', emoji:'🥔', per100:{kcal:82,p:2,c:17,f:0.1,na:6,k:379}},
+  {name:'Картошка фри', emoji:'🍟', per100:{kcal:312,p:3.4,c:41,f:15,na:210,k:580}},
+  {name:'Пюре картофельное', emoji:'🥔', per100:{kcal:106,p:2,c:16,f:4,na:300,k:300}},
+  {name:'Батат печёный', emoji:'🍠', per100:{kcal:90,p:2,c:21,f:0.1,na:36,k:475}},
+  {name:'Капуста белокочанная', emoji:'🥬', per100:{kcal:25,p:1.3,c:5,f:0.1,na:18,k:170}},
+  {name:'Брокколи', emoji:'🥦', per100:{kcal:34,p:2.8,c:7,f:0.4,na:33,k:316}},
+  {name:'Цветная капуста', emoji:'🥦', per100:{kcal:25,p:1.9,c:5,f:0.3,na:30,k:299}},
+  {name:'Кабачок', emoji:'🥒', per100:{kcal:17,p:1.2,c:3.1,f:0.3,na:8,k:261}},
+  {name:'Баклажан', emoji:'🍆', per100:{kcal:25,p:1,c:6,f:0.2,na:2,k:229}},
+  {name:'Свёкла отварная', emoji:'🫑', per100:{kcal:44,p:1.7,c:10,f:0.2,na:77,k:305}},
+  {name:'Авокадо', emoji:'🥑', per100:{kcal:160,p:2,c:9,f:15,na:7,k:485}},
+  {name:'Шампиньоны', emoji:'🍄', per100:{kcal:22,p:3.1,c:3.3,f:0.3,na:5,k:318}},
+  {name:'Зелёный горошек', emoji:'🫘', per100:{kcal:81,p:5.4,c:14,f:0.4,na:5,k:244}},
+  {name:'Кукуруза консервированная', emoji:'🌽', per100:{kcal:96,p:3,c:19,f:1.2,na:270,k:130}},
+  {name:'Фасоль красная (консервированная)', emoji:'🫘', per100:{kcal:99,p:6.7,c:15,f:0.5,na:250,k:380}},
+  {name:'Чечевица отварная', emoji:'🫘', per100:{kcal:116,p:9,c:20,f:0.4,na:2,k:369}},
+  {name:'Нут отварной', emoji:'🫘', per100:{kcal:164,p:8.9,c:27,f:2.6,na:7,k:291}},
+  {name:'Банан', emoji:'🍌', per100:{kcal:89,p:1.1,c:23,f:0.3,na:1,k:358}},
+  {name:'Яблоко', emoji:'🍎', per100:{kcal:52,p:0.3,c:14,f:0.2,na:1,k:107}},
+  {name:'Апельсин', emoji:'🍊', per100:{kcal:47,p:0.9,c:12,f:0.1,na:0,k:181}},
+  {name:'Мандарин', emoji:'🍊', per100:{kcal:53,p:0.8,c:13,f:0.3,na:2,k:166}},
+  {name:'Виноград', emoji:'🍇', per100:{kcal:69,p:0.7,c:18,f:0.2,na:2,k:191}},
+  {name:'Клубника', emoji:'🍓', per100:{kcal:33,p:0.7,c:8,f:0.3,na:1,k:153}},
+  {name:'Голубика', emoji:'🫐', per100:{kcal:57,p:0.7,c:14,f:0.3,na:1,k:77}},
+  {name:'Арбуз', emoji:'🍉', per100:{kcal:30,p:0.6,c:8,f:0.2,na:1,k:112}},
+  {name:'Дыня', emoji:'🍈', per100:{kcal:34,p:0.8,c:8,f:0.2,na:16,k:267}},
+  {name:'Киви', emoji:'🥝', per100:{kcal:61,p:1.1,c:15,f:0.5,na:3,k:312}},
+  {name:'Груша', emoji:'🍐', per100:{kcal:57,p:0.4,c:15,f:0.1,na:1,k:116}},
+  {name:'Финики', emoji:'🎂', per100:{kcal:277,p:1.8,c:75,f:0.2,na:1,k:696}},
+  {name:'Курага', emoji:'🍑', per100:{kcal:241,p:3.4,c:63,f:0.5,na:10,k:1162}},
+  {name:'Изюм', emoji:'🍇', per100:{kcal:299,p:3.1,c:79,f:0.5,na:11,k:749}},
+  {name:'Грецкий орех', emoji:'🥜', per100:{kcal:654,p:15,c:14,f:65,na:2,k:441}},
+  {name:'Миндаль', emoji:'🥜', per100:{kcal:579,p:21,c:22,f:50,na:1,k:733}},
+  {name:'Кешью', emoji:'🥜', per100:{kcal:553,p:18,c:30,f:44,na:12,k:660}},
+  {name:'Арахис', emoji:'🥜', per100:{kcal:567,p:26,c:16,f:49,na:18,k:705}},
+  {name:'Арахисовая паста', emoji:'🥜', per100:{kcal:588,p:25,c:20,f:50,na:430,k:649}},
+  {name:'Семена чиа', emoji:'🌿', per100:{kcal:486,p:17,c:42,f:31,na:16,k:407}},
+  /* ---- соусы, масла, сладкое ---- */
+  {name:'Масло оливковое', emoji:'🫒', per100:{kcal:884,p:0,c:0,f:100,na:2,k:1}},
+  {name:'Масло подсолнечное', emoji:'🫒', per100:{kcal:884,p:0,c:0,f:100,na:0,k:0}},
+  {name:'Майонез 67%', emoji:'🥫', per100:{kcal:625,p:0.5,c:2.6,f:67,na:800,k:30}},
+  {name:'Майонез лёгкий 30%', emoji:'🥫', per100:{kcal:300,p:0.6,c:6,f:30,na:900,k:30}},
+  {name:'Кетчуп', emoji:'🍅', per100:{kcal:98,p:1.3,c:23,f:0.2,na:900,k:280}},
+  {name:'Соевый соус', emoji:'🫙', per100:{kcal:53,p:8,c:5,f:0.1,na:5500,k:210}},
+  {name:'Горчица', emoji:'🫙', per100:{kcal:143,p:9.9,c:12,f:6,na:1100,k:150}},
+  {name:'Томатная паста', emoji:'🍅', per100:{kcal:82,p:4.3,c:19,f:0.5,na:59,k:1014}},
+  {name:'Сахар', emoji:'🧂', per100:{kcal:387,p:0,c:100,f:0,na:1,k:2}},
+  {name:'Мёд', emoji:'🍯', per100:{kcal:304,p:0.3,c:82,f:0,na:4,k:52}},
+  {name:'Шоколад молочный', emoji:'🍫', per100:{kcal:535,p:7.6,c:59,f:30,na:79,k:372}},
+  {name:'Шоколад тёмный 70%', emoji:'🍫', per100:{kcal:598,p:7.8,c:46,f:43,na:20,k:715}},
+  {name:'Печенье овсяное', emoji:'🍪', per100:{kcal:437,p:6,c:66,f:16,na:300,k:200}},
+  {name:'Вафли', emoji:'🧇', per100:{kcal:498,p:5,c:60,f:26,na:200,k:120}},
+  {name:'Пряник', emoji:'🍪', per100:{kcal:350,p:5,c:74,f:3,na:250,k:100}},
+  {name:'Зефир', emoji:'🍡', per100:{kcal:326,p:0.8,c:80,f:0,na:20,k:20}},
+  {name:'Мармелад', emoji:'🍬', per100:{kcal:321,p:0.4,c:79,f:0.1,na:15,k:20}},
+  {name:'Торт Наполеон', emoji:'🍰', per100:{kcal:390,p:5,c:40,f:23,na:200,k:100}},
+  {name:'Чизкейк', emoji:'🍰', per100:{kcal:321,p:5.5,c:26,f:22,na:340,k:130}},
+  {name:'Круассан', emoji:'🥐', per100:{kcal:406,p:8,c:45,f:21,na:450,k:120}},
+  {name:'Пончик', emoji:'🍩', per100:{kcal:452,p:6,c:51,f:25,na:400,k:110}},
+  {name:'Чипсы картофельные', emoji:'🥔', per100:{kcal:536,p:7,c:53,f:34,na:525,k:1275}},
+  {name:'Сухарики', emoji:'🍞', per100:{kcal:400,p:11,c:70,f:9,na:1200,k:200}},
+  /* ---- готовые блюда ---- */
+  {name:'Борщ', emoji:'🍜', per100:{kcal:49,p:1.6,c:6,f:2,na:350,k:200}},
+  {name:'Щи', emoji:'🍜', per100:{kcal:38,p:1.4,c:4,f:1.8,na:320,k:180}},
+  {name:'Суп-пюре грибной', emoji:'🍜', per100:{kcal:70,p:2,c:7,f:4,na:400,k:180}},
+  {name:'Плов с курицей', emoji:'🍛', per100:{kcal:190,p:9,c:24,f:7,na:400,k:200}},
+  {name:'Оливье', emoji:'🥗', per100:{kcal:198,p:5,c:8,f:16,na:450,k:200}},
+  {name:'Сельдь под шубой', emoji:'🥗', per100:{kcal:190,p:6,c:9,f:14,na:600,k:230}},
+  {name:'Цезарь с курицей', emoji:'🥗', per100:{kcal:190,p:12,c:6,f:13,na:520,k:220}},
+  {name:'Греческий салат', emoji:'🥗', per100:{kcal:110,p:3,c:5,f:9,na:450,k:250}},
+  {name:'Шаурма с курицей', emoji:'🌯', per100:{kcal:215,p:12,c:20,f:10,na:600,k:220}},
+  {name:'Бургер чизбургер', emoji:'🍔', per100:{kcal:270,p:14,c:26,f:12,na:600,k:200}},
+  {name:'Пицца Маргарита', emoji:'🍕', per100:{kcal:250,p:11,c:30,f:9,na:550,k:200}},
+  {name:'Пицца Пепперони', emoji:'🍕', per100:{kcal:290,p:12,c:29,f:14,na:700,k:210}},
+  {name:'Суши ролл Калифорния', emoji:'🍣', per100:{kcal:175,p:6,c:26,f:5,na:400,k:120}},
+  {name:'Блины с творогом', emoji:'🥞', per100:{kcal:210,p:9,c:26,f:8,na:300,k:150}},
+  {name:'Сырники запечённые', emoji:'🥞', per100:{kcal:180,p:15,c:18,f:6,na:200,k:150}},
+  {name:'Шашлык-лаваш (кебаб)', emoji:'🌯', per100:{kcal:230,p:13,c:22,f:11,na:620,k:230}},
+  {name:'Наггетсы куриные', emoji:'🍗', per100:{kcal:296,p:15,c:16,f:19,na:600,k:250}},
+  {name:'Пельмени сырые', emoji:'🥟', per100:{kcal:275,p:12,c:29,f:12,na:500,k:200}},
+  {name:'Вареники с картошкой', emoji:'🥟', per100:{kcal:180,p:5,c:33,f:3,na:350,k:220}},
+  {name:'Голубцы', emoji:'🥬', per100:{kcal:120,p:7,c:10,f:6,na:400,k:250}},
+  /* ---- напитки ---- */
+  {name:'Кофе с молоком (латте)', emoji:'☕️', per100:{kcal:42,p:2.3,c:4,f:1.9,na:40,k:120}},
+  {name:'Капучино', emoji:'☕️', per100:{kcal:37,p:2,c:3.5,f:1.7,na:35,k:110}},
+  {name:'Чай без сахара', emoji:'🍵', per100:{kcal:1,p:0,c:0.2,f:0,na:2,k:20}},
+  {name:'Кола (сладкая газировка)', emoji:'🥤', per100:{kcal:42,p:0,c:10.6,f:0,na:5,k:2}},
+  {name:'Кола без сахара (zero)', emoji:'🥤', per100:{kcal:0.3,p:0,c:0,f:0,na:8,k:2}},
+  {name:'Энергетик (сладкий)', emoji:'🥤', per100:{kcal:45,p:0,c:11,f:0,na:40,k:10}},
+  {name:'Пиво светлое 4.5%', emoji:'🍺', per100:{kcal:43,p:0.5,c:3.6,f:0,na:4,k:27}},
+  {name:'Вино сухое красное', emoji:'🍷', per100:{kcal:68,p:0.1,c:2.6,f:0,na:4,k:127}},
+  {name:'Водка', emoji:'🥃', per100:{kcal:231,p:0,c:0,f:0,na:1,k:1}},
+  {name:'Молоко овсяное', emoji:'🥛', per100:{kcal:45,p:1,c:7,f:1.5,na:60,k:100}},
+  {name:'Молоко миндальное без сахара', emoji:'🥛', per100:{kcal:15,p:0.5,c:0.3,f:1.2,na:60,k:60}},
+  {name:'Протеиновый коктейль на воде', emoji:'🥤', per100:{kcal:40,p:8,c:1,f:0.5,na:60,k:120}},
+  /* ---- спортивное и добавки ---- */
+  {name:'Казеин (порошок)', emoji:'🥤', per100:{kcal:360,p:78,c:5,f:2,na:200,k:600}},
+  {name:'Гейнер (порошок)', emoji:'🥤', per100:{kcal:380,p:20,c:65,f:4,na:150,k:400}},
+  {name:'Протеиновый батончик', emoji:'🍫', per100:{kcal:350,p:30,c:35,f:10,na:300,k:400}},
+  {name:'Креатин (5 г)', emoji:'💊', fixed:{kcal:0,p:0,c:0,f:0,na:0,k:0}},
+  {name:'Омега-3 (капсула)', emoji:'💊', fixed:{kcal:9,p:0,c:0,f:1,na:0,k:0}},
+  {name:'Магний цитрат (порция)', emoji:'💊', fixed:{kcal:0,p:0,c:0,f:0,na:0,k:0}},
+  /* ---- бренды и сети: пишется и латиницей, и кириллицей,
+     чтобы находилось любым набором ---- */
+  {name:'Активиа Activia творожная 4%', emoji:'🥛', per100:{kcal:104,p:8,c:11,f:3.5,na:50,k:130}},
+  {name:'Актимель Actimel (бутылочка 100 г)', emoji:'🥛', fixed:{kcal:73,p:2.8,c:12,f:1.5,na:45,k:130}},
+  {name:'Даниссимо Danissimo творожок', emoji:'🧀', per100:{kcal:170,p:6,c:18,f:8,na:70,k:120}},
+  {name:'Данон Danone творожный 0%', emoji:'🧀', per100:{kcal:60,p:9,c:5,f:0.1,na:50,k:130}},
+  {name:'Эпика Epica греческий йогурт', emoji:'🥛', per100:{kcal:120,p:5,c:12,f:5.6,na:45,k:130}},
+  {name:'Чудо творожок', emoji:'🧀', per100:{kcal:190,p:6,c:20,f:9.5,na:70,k:110}},
+  {name:'Простоквашино творог 5%', emoji:'🧀', per100:{kcal:121,p:16,c:3,f:5,na:41,k:112}},
+  {name:'Домик в деревне молоко 3.2%', emoji:'🥛', per100:{kcal:59,p:2.9,c:4.7,f:3.2,na:50,k:146}},
+  {name:'Савушкин творог зернёный', emoji:'🧀', per100:{kcal:98,p:14,c:3,f:3,na:300,k:110}},
+  {name:'Валио Valio греческий йогурт 0%', emoji:'🥛', per100:{kcal:57,p:10,c:4,f:0.1,na:45,k:140}},
+  {name:'Hochland сыр плавленый', emoji:'🧀', per100:{kcal:255,p:11,c:5,f:21,na:1100,k:100}},
+  {name:'Almette творожный сыр', emoji:'🧀', per100:{kcal:240,p:6,c:3,f:23,na:600,k:90}},
+  {name:'President масло 82%', emoji:'🧈', per100:{kcal:748,p:0.5,c:0.8,f:82,na:15,k:15}},
+  {name:'Алпен Гольд Alpen Gold молочный', emoji:'🍫', per100:{kcal:534,p:5.5,c:59,f:30,na:120,k:300}},
+  {name:'Милка Milka молочный шоколад', emoji:'🍫', per100:{kcal:534,p:6.3,c:59,f:29.5,na:130,k:340}},
+  {name:'Сникерс Snickers (батончик 50 г)', emoji:'🍫', fixed:{kcal:245,p:4.3,c:30,f:12,na:120,k:170}},
+  {name:'Твикс Twix (упаковка 50 г)', emoji:'🍫', fixed:{kcal:250,p:2.4,c:32,f:12,na:120,k:100}},
+  {name:'Марс Mars (батончик 50 г)', emoji:'🍫', fixed:{kcal:230,p:2,c:35,f:8.5,na:120,k:90}},
+  {name:'КитКат KitKat (4 палочки)', emoji:'🍫', fixed:{kcal:209,p:2.6,c:25,f:11,na:30,k:150}},
+  {name:'Киндер Kinder шоколад (палочка 12.5 г)', emoji:'🍫', fixed:{kcal:70,p:1.2,c:7,f:4.2,na:30,k:60}},
+  {name:'Нутелла Nutella', emoji:'🍫', per100:{kcal:539,p:6.3,c:57,f:31,na:41,k:407}},
+  {name:'Орео Oreo (печенье)', emoji:'🍪', per100:{kcal:480,p:5,c:70,f:20,na:400,k:200}},
+  {name:'Ферреро Роше Ferrero Rocher (1 шт)', emoji:'🍬', fixed:{kcal:73,p:1,c:6,f:5,na:10,k:60}},
+  {name:'Рафаэлло Raffaello (1 шт)', emoji:'🍬', fixed:{kcal:63,p:0.8,c:4.5,f:4.8,na:10,k:40}},
+  {name:'Алёнка шоколад', emoji:'🍫', per100:{kcal:534,p:7,c:57,f:30,na:100,k:330}},
+  {name:'Барилла Barilla паста сухая', emoji:'🍝', per100:{kcal:359,p:12,c:72,f:1.5,na:5,k:230}},
+  {name:'Макфа Makfa макароны сухие', emoji:'🍝', per100:{kcal:344,p:11.5,c:70,f:1.3,na:5,k:210}},
+  {name:'Увелка овсяные хлопья', emoji:'🥣', per100:{kcal:352,p:12,c:61,f:6,na:5,k:330}},
+  {name:'Мистраль рис сухой', emoji:'🍚', per100:{kcal:340,p:7,c:75,f:1,na:5,k:110}},
+  {name:'Геркулес хлопья', emoji:'🥣', per100:{kcal:355,p:11,c:62,f:6.2,na:5,k:330}},
+  {name:'Роллтон лапша (порция)', emoji:'🍜', fixed:{kcal:330,p:7,c:44,f:14,na:1600,k:150}},
+  {name:'БигБон BigBon лапша (порция)', emoji:'🍜', fixed:{kcal:350,p:8,c:46,f:15,na:1700,k:160}},
+  {name:'Хейнц Heinz кетчуп', emoji:'🍅', per100:{kcal:102,p:1.2,c:23,f:0.1,na:880,k:290}},
+  {name:'Кальве Calve майонез', emoji:'🥫', per100:{kcal:625,p:0.5,c:2.6,f:67,na:800,k:30}},
+  {name:'Махеевъ майонез провансаль', emoji:'🥫', per100:{kcal:620,p:0.5,c:2.6,f:67,na:800,k:30}},
+  {name:'Кока-Кола Coca-Cola', emoji:'🥤', per100:{kcal:42,p:0,c:10.6,f:0,na:5,k:2}},
+  {name:'Пепси Pepsi', emoji:'🥤', per100:{kcal:43,p:0,c:11,f:0,na:5,k:2}},
+  {name:'Фанта Fanta', emoji:'🥤', per100:{kcal:38,p:0,c:9.3,f:0,na:8,k:2}},
+  {name:'Спрайт Sprite', emoji:'🥤', per100:{kcal:37,p:0,c:9,f:0,na:8,k:2}},
+  {name:'Ред Булл Red Bull', emoji:'🥤', per100:{kcal:45,p:0,c:11,f:0,na:40,k:10}},
+  {name:'Адреналин Раш Adrenaline Rush', emoji:'🥤', per100:{kcal:52,p:0,c:13,f:0,na:40,k:10}},
+  {name:'Несквик Nesquik готовые завтраки', emoji:'🥣', per100:{kcal:385,p:7,c:78,f:4,na:300,k:300}},
+  {name:'Фитнес Fitness хлопья Nestle', emoji:'🥣', per100:{kcal:376,p:8,c:75,f:4,na:400,k:280}},
+  {name:'Любятово печенье овсяное', emoji:'🍪', per100:{kcal:437,p:6,c:66,f:16,na:300,k:200}},
+  {name:'Хлебный дом хлеб цельнозерновой', emoji:'🍞', per100:{kcal:230,p:9,c:40,f:3,na:430,k:230}},
+  {name:'Мираторг куриное филе', emoji:'🍗', per100:{kcal:113,p:23.6,c:0.4,f:1.9,na:60,k:292}},
+  {name:'Мираторг котлета для бургера', emoji:'🍔', per100:{kcal:245,p:17,c:1,f:19,na:450,k:270}},
+  {name:'Черкизово ветчина', emoji:'🥓', per100:{kcal:145,p:15,c:2,f:8,na:1000,k:250}},
+  {name:'Останкино сосиски', emoji:'🌭', per100:{kcal:266,p:11,c:2,f:24,na:900,k:200}},
+  {name:'Дымов сервелат', emoji:'🥓', per100:{kcal:461,p:24,c:0,f:40,na:1900,k:300}},
+  {name:'Вкусно и точка Большой Биг Спешел (порция)', emoji:'🍔', fixed:{kcal:503,p:26,c:41,f:26,na:1000,k:400}},
+  {name:'Вкусно и точка картошка фри стандарт', emoji:'🍟', fixed:{kcal:225,p:3,c:29,f:11,na:200,k:500}},
+  {name:'Макдоналдс McDonalds Биг Мак (порция)', emoji:'🍔', fixed:{kcal:503,p:26,c:41,f:26,na:1000,k:400}},
+  {name:'KFC баскет крылышек (порция 6 шт)', emoji:'🍗', fixed:{kcal:540,p:32,c:24,f:36,na:1500,k:400}},
+  {name:'Бургер Кинг Burger King Воппер (порция)', emoji:'🍔', fixed:{kcal:660,p:28,c:49,f:40,na:1100,k:500}},
+  {name:'Додо Пицца Dodo Пепперони (кусок)', emoji:'🍕', fixed:{kcal:230,p:10,c:24,f:11,na:520,k:180}},
+  {name:'Papa Johns пицца (кусок)', emoji:'🍕', fixed:{kcal:250,p:11,c:27,f:11,na:560,k:190}},
+  {name:'Сабвей Subway ролл с индейкой (15 см)', emoji:'🥪', fixed:{kcal:280,p:18,c:40,f:5,na:800,k:300}},
+  {name:'Теремок блин с курицей (порция)', emoji:'🥞', fixed:{kcal:390,p:18,c:42,f:16,na:700,k:250}},
+  {name:'Крошка Картошка (порция)', emoji:'🥔', fixed:{kcal:420,p:10,c:50,f:20,na:800,k:900}},
+  {name:'Шоколадница капучино 300 мл', emoji:'☕️', fixed:{kcal:150,p:8,c:14,f:7,na:120,k:400}},
+  {name:'Starbucks латте grande', emoji:'☕️', fixed:{kcal:190,p:12,c:19,f:7,na:150,k:500}},
+  {name:'Cinnabon булочка classic', emoji:'🥨', fixed:{kcal:880,p:15,c:127,f:36,na:830,k:300}},
+  {name:'Столовая: комплексный обед', emoji:'🍽', fixed:{kcal:750,p:30,c:80,f:32,na:1800,k:900}},
+  {name:'Альпро Alpro соевый йогурт', emoji:'🥛', per100:{kcal:50,p:4,c:2,f:2.3,na:60,k:130}},
+  {name:'Немолоко овсяное', emoji:'🥛', per100:{kcal:45,p:1,c:7,f:1.5,na:60,k:100}},
+  {name:'Chikalab батончик протеиновый', emoji:'🍫', per100:{kcal:340,p:30,c:36,f:9,na:300,k:400}},
+  {name:'Snaq Fabriq батончик', emoji:'🍫', per100:{kcal:330,p:28,c:38,f:8,na:280,k:380}},
+  {name:'Bite батончик фруктовый', emoji:'🍫', per100:{kcal:390,p:8,c:50,f:16,na:20,k:500}},
 ];
 
 /* ---- Open Food Facts (открытая база, без ключа; при офлайне — локальная база) ---- */
 function offToFood(prod){
   const n = prod.nutriments || {};
-  const kcal = n['energy-kcal_100g'] ?? n['energy-kcal'] ?? null;
-  if(kcal==null || kcal<=0) return null;
-  let name = String(prod.product_name_ru || prod.product_name || '')
+  const numOr = (...keys)=>{ for(const k of keys){ const v = n[k]; if(v!=null && isFinite(v)) return +v; } return null; };
+  const pr = numOr('proteins_100g','proteins') ?? 0;
+  const cb = numOr('carbohydrates_100g','carbohydrates') ?? 0;
+  const ft = numOr('fat_100g','fat') ?? 0;
+  let kcal = numOr('energy-kcal_100g','energy-kcal');
+  /* у многих европейских товаров заполнены только кДж — раньше такие продукты
+     просто выбрасывались и выглядело это как «продукт не найден» */
+  if(kcal==null){ const kj = numOr('energy_100g','energy-kj_100g','energy'); if(kj!=null && kj>0) kcal = kj/4.184; }
+  /* крайний случай: считаем калорийность из БЖУ */
+  if(kcal==null && (pr || cb || ft)) kcal = pr*4 + cb*4 + ft*9;
+  if(kcal==null || kcal<0 || kcal>1000) return null;
+  let name = String(prod.product_name_ru || prod.product_name || prod.product_name_en || prod.generic_name_ru || prod.generic_name || '')
     .replace(/[\u0000-\u001F\u007F\uFFFD]/g,' ')   // управляющие и «битые» символы
     .replace(/\s+/g,' ').trim();
+  const brand = prod.brands ? String(prod.brands).split(',')[0].trim() : '';
+  /* у части товаров заполнен только бренд — лучше показать его, чем ничего */
+  if(!name) name = brand;
   if(name.length>70) name = name.slice(0,70).trim()+'…';
   if(!name) return null;
-  const brand = prod.brands ? prod.brands.split(',')[0].trim() : '';
   let na = null;
   if(n.sodium_100g!=null) na = n.sodium_100g*1000;
   else if(n.salt_100g!=null) na = n.salt_100g*400;
   const k = n.potassium_100g!=null ? n.potassium_100g*1000 : null;
-  return { name: brand? `${name} — ${brand}` : name, emoji:'🍽',
-    per100:{ kcal:Math.round(kcal), p:r1(n.proteins_100g||0), c:r1(n.carbohydrates_100g||0), f:r1(n.fat_100g||0),
+  const withBrand = brand && !normFoodStr(name).includes(normFoodStr(brand)) ? `${name} — ${brand}` : name;
+  return { name: withBrand, emoji:'🍽', off:true, code: prod.code || null,
+    per100:{ kcal:Math.round(kcal), p:r1(pr), c:r1(cb), f:r1(ft),
       na: na!=null? Math.round(na): null, k: k!=null? Math.round(k): null } };
 }
 async function offFetchJson(url, ms){
@@ -1518,33 +1787,77 @@ async function offFetchJson(url, ms){
     return await res.json();
   } finally { clearTimeout(t); }
 }
+/* Несколько зеркал сразу: ru-зеркало знает русские названия, world — больше товаров,
+   а search-сервис даёт лучшую релевантность. Любой из них регулярно отваливается,
+   поэтому спрашиваем все параллельно и берём всё, что успело ответить */
+const OFF_HOSTS = ['https://ru.openfoodfacts.org', 'https://world.openfoodfacts.org'];
+const OFF_FIELDS = 'code,product_name,product_name_ru,product_name_en,generic_name,generic_name_ru,brands,nutriments';
 async function searchOpenFoodFacts(query){
-  const enc = encodeURIComponent(query);
-  /* 1) новый быстрый поиск OFF */
-  try{
-    const d = await offFetchJson('https://search.openfoodfacts.org/search?q='+enc+'&langs=ru,en&page_size=20&fields=product_name,product_name_ru,brands,nutriments', 6000);
-    const hits = (d.hits||[]).map(offToFood).filter(Boolean);
-    if(hits.length) return hits;
-  }catch(e){}
-  /* 2) классический поиск, две попытки — сервер часто отвечает со второго раза */
-  const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms='+enc+'&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments';
-  try{ const d = await offFetchJson(url, 8000); return (d.products||[]).map(offToFood).filter(Boolean); }catch(e){}
-  const d = await offFetchJson(url, 12000);
-  return (d.products||[]).map(offToFood).filter(Boolean);
+  const variants = offQueryVariants(query);
+  if(!variants.length) return [];
+  const urls = [];
+  variants.forEach((q, qi)=>{
+    const enc = encodeURIComponent(q);
+    urls.push('https://search.openfoodfacts.org/search?q='+enc+'&langs=ru,en&page_size=25&fields='+OFF_FIELDS);
+    urls.push('https://ru.openfoodfacts.org/cgi/search.pl?search_terms='+enc+'&search_simple=1&action=process&json=1&page_size=25&lc=ru&fields='+OFF_FIELDS);
+    /* world дёргаем только для основного варианта запроса, чтобы не получить бан по частоте */
+    if(qi===0) urls.push('https://world.openfoodfacts.org/cgi/search.pl?search_terms='+enc+'&search_simple=1&action=process&json=1&page_size=25&lc=ru&fields='+OFF_FIELDS);
+  });
+  const settled = await Promise.allSettled(urls.map(u=>offFetchJson(u, 9000)));
+  const out = [], seen = new Set();
+  let anyOk = false;
+  for(const r of settled){
+    if(r.status!=='fulfilled' || !r.value) continue;
+    anyOk = true;
+    const arr = r.value.hits || r.value.products || [];
+    for(const prod of arr){
+      const f = offToFood(prod);
+      if(!f) continue;
+      const key = normFoodStr(f.name);
+      if(!key || seen.has(key)) continue;
+      seen.add(key); out.push(f);
+    }
+  }
+  if(!anyOk) throw new Error('network');
+  return out;
+}
+/* Штрихкод может лежать в базе в другой форме: UPC-A без ведущего нуля, EAN-8,
+   код с лишним нулём слева. Из-за этого реально существующие товары раньше не находились */
+function barcodeVariants(code){
+  const c = String(code||'').replace(/\D/g,'');
+  if(c.length < 6) return [];
+  const v = [c];
+  const add = x=>{ if(x && v.indexOf(x)<0) v.push(x); };
+  if(c.length===12) add('0'+c);
+  if(c.length===13 && c[0]==='0') add(c.slice(1));
+  if(c.length===8){ add(c.replace(/^0+/,'')); add(c.padStart(13,'0')); }
+  if(c.length<13) add(c.padStart(13,'0'));
+  return v.slice(0,4);
 }
 async function lookupBarcodeOFF(code){
-  const url = 'https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,product_name_ru,brands,nutriments,status';
-  /* сервер OFF часто не отвечает или отвечает с ошибкой с первого раза — как и в текстовом
-     поиске, даём ещё 2 попытки с растущим таймаутом, прежде чем считать, что продукта нет */
-  let lastErr = null;
-  for(const ms of [6000, 9000, 12000]){
-    try{
-      const data = await offFetchJson(url, ms);
-      if(data.status!==1 || !data.product) return null;
-      return offToFood(data.product);
-    }catch(e){ lastErr = e; }
+  const codes = barcodeVariants(code);
+  if(!codes.length) return { ok:false, reason:'badcode' };
+  const reqs = [];
+  codes.forEach((c, ci)=>{
+    for(const host of OFF_HOSTS) reqs.push(host+'/api/v2/product/'+c+'.json?fields='+OFF_FIELDS+',status');
+    /* старый v0 иногда отдаёт товар, который v2 не видит */
+    if(ci===0) reqs.push('https://world.openfoodfacts.org/api/v0/product/'+c+'.json');
+  });
+  const settled = await Promise.allSettled(reqs.map(u=>offFetchJson(u, 9000)));
+  let anyOk = false, foundName = '';
+  for(const r of settled){
+    if(r.status!=='fulfilled' || !r.value) continue;
+    anyOk = true;
+    const prod = r.value.product;
+    if(!prod) continue;
+    const f = offToFood(prod);
+    if(f) return { ok:true, food:f };
+    /* карточка есть, но КБЖУ никто не заполнил — честно скажем об этом */
+    if(!foundName) foundName = String(prod.product_name_ru || prod.product_name || prod.brands || '').trim();
   }
-  throw lastErr || new Error('network');
+  if(!anyOk) throw new Error('network');
+  if(foundName) return { ok:false, reason:'nodata', name:foundName };
+  return { ok:false, reason:'notfound' };
 }
 
 /* ================= Публичная база продуктов (общая для всех пользователей) =================
@@ -1585,7 +1898,7 @@ async function loadPublicFoods(){
 async function publishFood(food){
   if(!publicDbReady()) return false;
   /* Клиентская валидация + троттлинг. ВНИМАНИЕ: это НЕ защита — anon-ключ виден в клиенте.
-     Реальн��ю защиту от мусора должны обеспечивать RLS-политика и валидация в edge-функции на сервере. */
+     Реальню защиту от мусора должны обеспечивать RLS-политика и валидация в edge-функции на сервере. */
   const name = String(food.name||'').trim();
   const per = food.per100 || {};
   const numOk = (x, max)=> x==null || (typeof x==='number' && isFinite(x) && x>=0 && x<=max);
@@ -2329,7 +2642,7 @@ function getSmartAdvice(){
     return `К вечеру выпито только ${(water/1000).toFixed(1)} л из ${(norm/1000).toFixed(1)} л. Равномерно добери норму, но не заливай всё перед сном`;
   const steps3 = lastDays(3).reduce((s,x)=>s+daySteps(x),0)/3;
   if(steps3 < 4000)
-    return `Шагов в после��ние дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
+    return `Шагов в посление дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
   const si = streakInfo();
   return `Ты на верном пути${si.display>1?` — уже ${si.display}-й день подряд`:''}. Держи белок около ${targetProtein} г, соль до ${SALT_LIMIT} г и не пропускай шаги`;
 }
@@ -2562,7 +2875,7 @@ function workoutsHtml(){
   const ds = logDs();
   const list = S.workoutLog[ds] || [];
   return `
-    <div class="sheet-title">Т��енировки${editDs? ' · '+fmtDate(editDs) : ''}</div>
+    <div class="sheet-title">Тенировки${editDs? ' · '+fmtDate(editDs) : ''}</div>
     ${list.length
       ? list.map((w,i)=>workoutItemHtml(w,i)).join('')
       : `<div class="empty-mid">${editDs? 'В этот день тренировок не записано' : 'Сегодня тренировок ещё не было'}</div>`}
@@ -2590,7 +2903,7 @@ const ACTS = [
 ];
 const EFFORTS = [ {e:'😌',n:'Легко'}, {e:'🙂',n:'Умеренно'}, {e:'😤',n:'Тяжело'}, {e:'🥵',n:'Очень тяжело'} ];
 /* solo-групп больше нет: раньше выбор «Всё тело/Верх/Низ» сбрасывал остальные
-   отметки и набрать несколько групп был�� невозможно */
+   отметки и набрать несколько групп был невозможно */
 const MUSCLE_ZONES = [
   {n:'Всё тело', f:1.15},
   {n:'Верх', f:1.0},
@@ -2954,7 +3267,7 @@ function renderFoodTabBody(){
   else if(foodTab==='own'){
     body.innerHTML = `
       <div class="field-label">Новое блюдо (на 100 г)</div>
-      <input class="plain-input" id="cfName" type="text" placeholder="Название" style="margin-bottom:8px">
+      <input class="plain-input" id="cfName" type="text" placeholder="Название" value="${escapeHtml(pendingCfName||'')}" style="margin-bottom:8px">
       <div class="import-row2">
         <input class="plain-input" id="cfKcal" type="text" inputmode="decimal" placeholder="ккал на 100 г">
         <input class="plain-input" id="cfP" type="text" inputmode="decimal" placeholder="Б, г — можно 3.6">
@@ -2978,18 +3291,40 @@ function renderFoodTabBody(){
 }
 
 let offAbort = 0, offTimer = null;
-/* поисковые синонимы: как говорят → как записано в базе */
-const FOOD_SYN = {
-  'картошка':'картофель','картоха':'картофель','картофан':'картофель',
-  'макарошки':'макароны','спагетти':'макароны','вермишель':'макароны','паста':'макарон',
-  'яйца':'яйцо','яичко':'яйцо','творожок':'творог',
-  'курица':'кури','курочка':'кури','курятина':'кури',
-  'морковка':'морковь','свеколка':'свекла','помидорка':'помидор','огурчик':'огурец',
-  'молочко':'молоко','хлебушек':'хлеб','рыбка':'рыб','супчик':'суп','кашка':'каша','салатик':'салат','котлетка':'котлета'
-};
-function normFoodStr(x){ return String(x||'').toLowerCase().replace(/ё/g,'е'); }
-/* расстояние Левенштейна, но останавливаемся, как только ясно что оно больше limit —
-   для коротких слов запроса этого достаточно и не нужно считать полную матрицу */
+let pendingCfName = '';
+
+/* ================= Поисковый движок =================
+   Задача: находить с полуслова. Раньше требовалось совпадение КАЖДОГО слова запроса
+   и результат был бинарным: «грудка курицы» не находило «Куриная грудка».
+   Теперь: морфология (курицы/куриный → одна основа), префиксы, опечатки,
+   синонимы, латинская раскладка (rehbwf → курица) и транслит (kurica → курица),
+   а результаты ранжируются по релевантности, а не отбрасываются целиком. */
+const LAYOUT_RU = { q:'й',w:'ц',e:'у',r:'к',t:'е',y:'н',u:'г',i:'ш',o:'щ',p:'з','[':'х',']':'ъ',
+  a:'ф',s:'ы',d:'в',f:'а',g:'п',h:'р',j:'о',k:'л',l:'д',';':'ж',"'":'э',
+  z:'я',x:'ч',c:'с',v:'м',b:'и',n:'т',m:'ь',',':'б','.':'ю' };
+const TRANSLIT_PAIRS = [['shch','щ'],['sch','щ'],['sh','ш'],['ch','ч'],['zh','ж'],['yu','ю'],['ya','я'],['ye','е'],
+  ['yo','е'],['ts','ц'],['kh','х'],['ee','и'],['oo','у'],['ck','к'],['a','а'],['b','б'],['v','в'],['g','г'],['d','д'],
+  ['e','е'],['z','з'],['i','и'],['j','й'],['k','к'],['l','л'],['m','м'],['n','н'],['o','о'],['p','п'],['r','р'],
+  ['s','с'],['t','т'],['u','у'],['f','ф'],['h','х'],['c','к'],['y','ы'],['w','в'],['x','кс'],['q','к']];
+function fromLayout(w){ let o=''; for(const ch of w) o += (LAYOUT_RU[ch] || ch); return o; }
+function fromTranslit(w){ let o = w; for(const pair of TRANSLIT_PAIRS) o = o.split(pair[0]).join(pair[1]); return o; }
+function normFoodStr(x){
+  return String(x||'').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9%.\s-]/g,' ').replace(/\s+/g,' ').trim();
+}
+function foodTokens(x){ return normFoodStr(x).split(/[^a-zа-я0-9%]+/).filter(Boolean); }
+/* Лёгкий стеммер: срезаем русские окончания, чтобы падежи и множественное
+   число сходились: курица/курицы/куриная → куриц/курин */
+const RU_ENDINGS = ['ами','ями','ого','его','ому','ему','ыми','ими','ая','яя','ое','ее','ые','ие','ый','ий',
+  'ой','ей','ом','ем','ах','ях','ов','ев','ам','ям','ую','юю','ья','ье','ьи','а','я','о','е','ы','и','у','ю','ь','й'];
+function foodStem(w){
+  if(w.length<=3) return w;
+  for(const e of RU_ENDINGS){
+    if(w.length - e.length >= 3 && w.slice(-e.length)===e) return w.slice(0, w.length-e.length);
+  }
+  return w;
+}
+function commonPrefixLen(a,b){ const n=Math.min(a.length,b.length); let i=0; while(i<n && a[i]===b[i]) i++; return i; }
+/* расстояние Левенштейна с ранним выходом, когда оно уже больше limit */
 function editDistanceWithin(a, b, limit){
   if(Math.abs(a.length-b.length) > limit) return false;
   const m = a.length, n = b.length;
@@ -3006,59 +3341,156 @@ function editDistanceWithin(a, b, limit){
   }
   return prev[n] <= limit;
 }
-function foodMatchesQuery(food, q){
-  if(!q) return true;
-  const name = normFoodStr(food.name);
-  const nameWords = name.split(/[^a-zа-я0-9%.]+/).filter(Boolean);
-  const words = normFoodStr(q).split(/\s+/).filter(Boolean);
-  const matchesWord = (w)=>{
-    if(name.includes(w)) return true;
-    /* грубая основа слова: «помидоры» → «помидо» — ловим падежи и множественное число */
-    const st = w.length>5 ? w.slice(0, w.length-2) : w;
-    if(nameWords.some(nw => nw.startsWith(st))) return true;
-    /* опечатка на 1 букву (пропуск/лишняя/замена) — «курина» вместо «курица», «малако» вместо «молоко» */
-    if(w.length>=4) return nameWords.some(nw => editDistanceWithin(w, nw, 1) || editDistanceWithin(w, nw.slice(0, w.length), 1));
-    return false;
-  };
-  return words.every(w=>{
-    /* синоним РАСШИРЯЕТ запрос, а не заменяет: «спагетти» ищет и «спагетти», и «макароны» */
-    const alts = FOOD_SYN[w] ? [w, FOOD_SYN[w]] : [w];
-    return alts.some(matchesWord);
+/* Как говорят люди → как называется в базе. Синоним РАСШИРЯЕТ запрос, не заменяет его */
+const FOOD_SYN = {
+  'картошка':['картофель'],'картоха':['картофель'],'картофан':['картофель'],'фри':['картофель'],
+  'макарошки':['макарон'],'спагетти':['макарон','паста'],'вермишель':['макарон'],
+  'паста':['макарон'],'рожки':['макарон'],'лапша':['макарон'],
+  'яйца':['яйцо'],'яичко':['яйцо'],'белки':['белок'],'творожок':['творог'],
+  'кура':['курица','курин'],'курочка':['курица','курин'],'курятина':['курица','курин'],
+  'грудка':['грудка','филе'],'филешка':['филе'],'говяшка':['говядина'],
+  'морковка':['морковь'],'свеколка':['свекла'],'бурак':['свекла'],
+  'помидорка':['помидор','томат'],'томат':['помидор'],'помидор':['томат'],
+  'огурчик':['огурец'],'капустка':['капуста'],'брокколи':['брокколи','капуста'],
+  'молочко':['молоко'],'хлебушек':['хлеб'],'батон':['хлеб'],'булка':['хлеб'],
+  'рыбка':['рыба'],'супчик':['суп'],'кашка':['каша'],'салатик':['салат'],
+  'котлетка':['котлета'],'греча':['гречка'],'гречиха':['гречка'],'овсянка':['овсян','геркулес','хлопья'],
+  'геркулес':['овсян','хлопья'],'овсянка':['овсян'],'протеинка':['протеин'],'проташка':['протеин'],
+  'шоколадка':['шоколад'],'кола':['кола','coca','cola'],'кокакола':['кола','coca'],
+  'макдак':['макдоналдс','вкусно'],'мак':['макдоналдс'],'макдональдс':['макдоналдс','вкусно'],
+  'бк':['бургер'],'воппер':['бургер'],'додо':['додо','пицца'],'пепперони':['пицца'],
+  'шаверма':['шаурма'],'шава':['шаурма'],'донер':['шаурма'],'кебаб':['шаурма'],
+  'сосиска':['сосиски'],'сарделька':['сосиски'],'колбаска':['колбаса'],
+  'йогуртик':['йогурт'],'греческий':['греческий'],'сырок':['сырок','творог'],
+  'семга':['лосось'],'сёмга':['лосось'],'креветка':['креветки'],
+  'вода':['вода'],'газировка':['кола','газировка'],'пепсик':['пепси'],
+  'батончик':['батончик'],'батончики':['батончик'],'шашлычок':['шашлык'],
+  'пельмешки':['пельмени'],'вареник':['вареники'],'блинчик':['блин'],
+  'кефирчик':['кефир'],'сметанка':['сметана'],'маслице':['масло'],
+  'гречневая':['гречка'],'гречневый':['гречка'],'гречнев':['гречка'],
+  'куриная':['курица'],'куриный':['курица'],'куриное':['курица'],'курин':['курица'],
+  'овсяная':['овсянка','овсян'],'рисовая':['рис'],'пшеничная':['пшеница','хлеб'],
+  'творожная':['творог'],'творожный':['творог'],'молочная':['молоко'],'молочный':['молоко'],
+  'картофельное':['картофель'],'картофельные':['картофель'],'говяжий':['говядина'],'свиной':['свинина'],
+  'орешки':['орех'],'семечки':['семена','семечки'],'арашка':['арахис']
+};
+/* Разбор запроса: каждое слово → набор вариантов (само слово, раскладка, транслит, синонимы) */
+function parseQuery(q){
+  const list = foodTokens(q);
+  const words = list.map(w=>{
+    const set = [w];
+    const add = x=>{ if(x && x.length>1 && set.indexOf(x)<0) set.push(x); };
+    if(/[a-z]/.test(w)){ add(fromLayout(w)); add(fromTranslit(w)); }
+    (FOOD_SYN[w]||[]).forEach(add);
+    (FOOD_SYN[foodStem(w)]||[]).forEach(add);
+    return set.map(v=>({ w:v, s:foodStem(v) }));
   });
+  return { words:words, len:list.length };
+}
+/* оценка одного слова запроса против названия продукта */
+function wordScore(v, nameTokens, nameStems){
+  const qw = v.w, qs = v.s;
+  let best = 0;
+  for(let i=0;i<nameTokens.length;i++){
+    const nt = nameTokens[i], ns = nameStems[i];
+    let sc = 0;
+    if(nt===qw) sc = 100;
+    else if(nt.indexOf(qw)===0) sc = 94 - Math.min(18, nt.length-qw.length);   // «кур» → «курица»
+    else if(qw.indexOf(nt)===0 && nt.length>=3) sc = 82;                        // «гречкой» → «гречка»
+    /* важно: короткие токены вроде «г» или «5» не должны совпадать со всем подряд */
+    else if(ns.length>=3 && qs.length>=3 && (ns.indexOf(qs)===0 || qs.indexOf(ns)===0)) sc = 80;
+    else if(ns.length>=4 && qs.length>=4 && commonPrefixLen(ns,qs) >= 4) sc = 72;  // курин/куриц
+    else if(qw.length>=3 && nt.length>=4 && nt.indexOf(qw)>0) sc = 62;             // вхождение в середине
+    /* опечатки: в коротких словах — одна, в длинных — две (малако → молоко) */
+    else if(qw.length>=4 && nt.length>=4 && editDistanceWithin(qw, nt, qw.length>=6?2:1)) sc = 58;
+    else if(qw.length>=4 && nt.length>qw.length+1 && editDistanceWithin(qw, nt.slice(0,qw.length), 1)) sc = 54;
+    if(i===0 && sc) sc += 6;   // совпадение в начале названия важнее
+    if(sc>best) best = sc;
+  }
+  return best;
+}
+function foodScore(food, parsed){
+  if(!parsed.len) return 1;
+  const nt = foodTokens(food.name);
+  if(!nt.length) return 0;
+  const ns = nt.map(foodStem);
+  let total = 0, matched = 0;
+  for(const grp of parsed.words){
+    let best = 0;
+    for(const v of grp){ const sc = wordScore(v, nt, ns); if(sc>best) best = sc; }
+    if(best >= 54){ matched++; total += best; }
+  }
+  if(!matched) return 0;
+  let score = total / matched;
+  /* нашли не все слова — показываем, но ниже полных совпадений:
+     лучше дать человеку близкие варианты, чем пустой экран */
+  if(matched < parsed.len) score *= (0.5 + 0.4 * (matched / parsed.len));
+  if(food.pinned && matched === parsed.len) score += 4;
+  return score;
+}
+/* запросы для онлайн-базы: исходный и исправленный (раскладка/транслит) */
+function offQueryVariants(q){
+  const base = normFoodStr(q);
+  if(!base) return [];
+  const out = [base];
+  if(/[a-z]/.test(base)){
+    const lay = base.split(' ').map(fromLayout).join(' ');
+    if(lay!==base && /[а-я]/.test(lay)) out.push(lay);
+  }
+  return out.slice(0,2);
 }
 function doFoodSearch(q){
   const box = document.getElementById('searchResults');
   if(!box) return;
-  q = (q||'').trim().toLowerCase();
+  q = String(q||'').trim();
+  const parsed = parseQuery(q);
   const mine = FOOD_DB.concat(S.customFoods);
-  const seen = new Set(mine.map(f=>f.name.toLowerCase()));
-  const local = mine.concat(PUBLIC_FOODS.filter(f=>!seen.has(f.name.toLowerCase()))).filter(f=>foodMatchesQuery(f, q));
-  const ranked = rankFoods(local).slice(0, q? 30 : 15);
-  /* Всегда показываем локальную базу */
-  box.innerHTML = (ranked.length
-    ? ranked.map(f=>foodResultHtml(f)).join('')
-    : '<div class="empty-hint">В базе ничего не нашлось — попробуй другое слово</div>')
-    + (q && q.length>=3 ? '<div class="result-source" id="offStatus"><span class="spinner"></span> Ищем в онлайн-базе…</div><div id="offResults"></div>' : '');
-  if(q && q.length>=3){
-    const my = ++offAbort;
-    clearTimeout(offTimer);
-    /* пауза, чтобы не дёргать онлайн-базу на каждую букву — иначе она банит за частые запросы */
-    offTimer = setTimeout(()=>{
-      if(my!==offAbort) return;
-      searchOpenFoodFacts(q).then(list=>{
-        if(my!==offAbort) return;
-        const st = document.getElementById('offStatus');
-        const res = document.getElementById('offResults');
-        if(!st || !res) return;
-        if(!list.length){ st.textContent = 'В онлайн-базе ничего не нашлось'; return; }
-        st.textContent = 'Из онлайн-базы:';
-        res.innerHTML = rankFoods(list).slice(0,10).map(f=>foodResultHtml(f)).join('');
-      }).catch(()=>{
-        const st = document.getElementById('offStatus');
-        if(st && my===offAbort) st.textContent = 'Онлайн-база не ответила — попробуй ещё раз через пару секунд';
-      });
-    }, 400);
+  const seen = new Set(mine.map(f=>normFoodStr(f.name)));
+  const pool = mine.concat(PUBLIC_FOODS.filter(f=>!seen.has(normFoodStr(f.name))));
+  let ranked;
+  if(!parsed.len){
+    ranked = rankFoods(pool).slice(0,15);
+  } else {
+    ranked = pool.map(f=>({f:f, s:foodScore(f, parsed)}))
+      .filter(x=>x.s>0)
+      .sort((a,b)=> (b.s-a.s) || (freqScore(b.f.name)-freqScore(a.f.name)) || a.f.name.length-b.f.name.length)
+      .slice(0,40).map(x=>x.f);
   }
+  const shown = new Set(ranked.map(f=>normFoodStr(f.name)));
+  /* онлайн-база подключается уже со второй буквы, а не с третьей */
+  const online = q.length>=2;
+  box.innerHTML = (ranked.length
+      ? ranked.map(f=>foodResultHtml(f)).join('')
+      : (online ? '' : '<div class="empty-hint">Начни писать — найдём с полуслова</div>'))
+    + (online ? '<div class="result-source" id="offStatus"><span class="spinner"></span> Ищем в открытой базе…</div><div id="offResults"></div>' : '');
+  if(!online) return;
+  const my = ++offAbort;
+  clearTimeout(offTimer);
+  /* небольшая пауза, чтобы не шлать запрос на каждую букву */
+  offTimer = setTimeout(()=>{
+    if(my!==offAbort) return;
+    searchOpenFoodFacts(q).then(list=>{
+      if(my!==offAbort) return;
+      const st = document.getElementById('offStatus');
+      const res = document.getElementById('offResults');
+      if(!st || !res) return;
+      /* ранжируем онлайн-результаты тем же движком — OFF отдаёт много мусора */
+      const scored = list.filter(f=>!shown.has(normFoodStr(f.name)))
+        .map(f=>({f:f, s:foodScore(f, parsed)}))
+        .sort((a,b)=> b.s-a.s)
+        .filter((x,i)=> x.s>0 || i<5)
+        .slice(0,12).map(x=>x.f);
+      if(!scored.length){
+        st.textContent = ranked.length ? 'В открытой базе больше ничего нет' : 'Ничего не нашлось — попробуй короче или добавь своё блюдо';
+        return;
+      }
+      st.textContent = 'Из открытой базы:';
+      res.innerHTML = scored.map(f=>foodResultHtml(f)).join('');
+    }).catch(()=>{
+      const st = document.getElementById('offStatus');
+      if(st && my===offAbort) st.textContent = 'Открытая база не ответила — локальные результаты выше работают';
+    });
+  }, 250);
 }
 
 let cfPublic = false;
@@ -3138,7 +3570,7 @@ function addPickedToLog(grams){
     item = { name:f.name, emoji:f.emoji||'🍽', time:nowTime(), grams:Math.round(grams),
       kcal:Math.round(per.kcal*m), p:r1(per.p*m), c:r1(per.c*m), f:r1(per.f*m),
       na: per.na!=null? Math.round(per.na*m) : null, k: per.k!=null? Math.round(per.k*m) : null,
-      /* храним базу на 100 г — правки граммовки пересчитываются от неё, без накопления о��ибки округления */
+      /* храним базу на 100 г — правки граммовки пересчитываются от неё, без накопления оибки округления */
       per100: { kcal:per.kcal, p:per.p, c:per.c, f:per.f, na:per.na!=null?per.na:null, k:per.k!=null?per.k:null } };
   } else {
     const x = f.fixed || f;
@@ -3256,22 +3688,49 @@ async function startScanner(){
   }catch(e){ if(status) status.textContent = 'Нет доступа к камере — введи код вручную'; }
 }
 ACTIONS.manualBarcode = ()=>{
-  const code = document.getElementById('manualCode').value.trim();
-  if(code.length<8){ showToast('Код слишком короткий'); return; }
+  /* люди вводят код с пробелами и дефисами — чистим всё лишнее */
+  const raw = (document.getElementById('manualCode')||{}).value || '';
+  const code = raw.replace(/\D/g,'');
+  if(code.length<8){ showToast('Код слишком короткий — нужно минимум 8 цифр'); return; }
   handleBarcode(code);
 };
 async function handleBarcode(code){
   haptic('medium');
+  const clean = String(code||'').replace(/\D/g,'');
   const status = document.getElementById('scanStatus');
-  if(status) status.innerHTML = '<span class="spinner"></span> Ищу продукт ' + escapeHtml(code) + '…';
+  const box = document.getElementById('scanResult');
+  if(box) box.innerHTML = '';
+  if(status) status.innerHTML = '<span class="spinner"></span> Ищу продукт ' + escapeHtml(clean) + '…';
   try{
-    const f = await lookupBarcodeOFF(code);
-    const box = document.getElementById('scanResult');
-    if(!f){ if(status) status.textContent = 'Продукт не найден в базе'; return; }
-    if(status) status.textContent = 'Найдено:';
-    if(box) box.innerHTML = foodResultHtml(f, 'Open Food Facts');
-  }catch(e){ if(status) status.textContent = 'Нет интернета — поиск по штрихкоду недоступен'; }
+    const res = await lookupBarcodeOFF(clean);
+    if(res && res.ok){
+      if(status) status.textContent = 'Найдено:';
+      if(box) box.innerHTML = foodResultHtml(res.food, 'Open Food Facts');
+      haptic('ok');
+      return;
+    }
+    const nm = (res && res.name) || '';
+    if(status) status.textContent = (res && res.reason==='nodata')
+      ? 'Продукт есть в базе, но КБЖУ в ней не заполнены'
+      : ((res && res.reason==='badcode') ? 'Код похож на неполный — отсканируй ещё раз' : 'Такого кода в открытой базе нет');
+    /* тупик вместо ошибки: сразу даём добавить вручную с подставленным названием */
+    if(box) box.innerHTML = `<button class="data-btn" data-act="retryBarcode" data-arg="${clean}">Повторить поиск</button>`
+      + `<button class="data-btn" data-act="newFoodFromCode" data-arg="${encodeURIComponent(nm)}">Добавить продукт вручную${nm? ' «'+escapeHtml(nm)+'»' : ''}</button>`;
+  }catch(e){
+    if(status) status.textContent = 'Открытая база не ответила — проверь интернет';
+    if(box) box.innerHTML = `<button class="data-btn" data-act="retryBarcode" data-arg="${clean}">Повторить поиск</button>`
+      + `<button class="data-btn" data-act="newFoodFromCode" data-arg="">Добавить продукт вручную</button>`;
+  }
 }
+ACTIONS.retryBarcode = (arg)=> handleBarcode(arg||'');
+ACTIONS.newFoodFromCode = (arg)=>{
+  let nm = '';
+  try{ nm = decodeURIComponent(arg||''); }catch(e){ nm = arg||''; }
+  pendingCfName = nm;
+  stopScanner();
+  foodTab = 'own';
+  renderFoodTabBody();
+};
 
 /* ================= Запись веса ================= */
 function upsertWeight(ds, w){
@@ -3401,7 +3860,7 @@ function renderStatsTab(){
         <div class="chart-holder">${weightChartSvg(w30.length>=2? w30 : wAll, slope)}</div>
       </div>
 
-      <div class="section-title">Кален��арь сушки</div>
+      <div class="section-title">Каленарь сушки</div>
       <div class="card rise" style="animation-delay:.2s">
         <div class="calendar-grid">${cal}</div>
         <div class="cal-legend"><span><i class="cal-dot ok"></i>в норме</span><span><i class="cal-dot warn"></i>отклонение</span><span><i class="cal-dot bad"></i>перебор</span><span><i class="cal-dot frozen"></i>заморозка</span></div>
@@ -3584,7 +4043,7 @@ ACTIONS.setAccent = (arg)=>{ S.theme.accent = arg; save(); applyTheme(); renderT
 ACTIONS.openImport = ()=>{
   openSheet(`
     <div class="sheet-title">Импорт истории сушки</div>
-    <div class="modal-text">Уже какое-то время на сушке? Добавь прошлые дни — прило��ение восстановит стрик, графики, средний дефицит и прогноз. Обязательны только калории; вес и БЖУ — по желанию, с ними статистика будет детальнее</div>
+    <div class="modal-text">Уже какое-то время на сушке? Добавь прошлые дни — прилоение восстановит стрик, графики, средний дефицит и прогноз. Обязательны только калории; вес и БЖУ — по желанию, с ними статистика будет детальнее</div>
     <div class="actions-grid" style="margin-top:14px">
       <button class="btn-primary" data-act="importByDays">Заполнить по дням</button>
       <button class="btn-secondary" data-act="importByText">Вставить текстом (хоть 200 дней)</button>
