@@ -345,15 +345,16 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .lock-logo{ font-size:54px; margin-bottom:4px; }
 .lock-reason{ font-size:11px; color:var(--text-secondary); opacity:.55; margin-top:8px; }
 /* grid-auto-rows:1fr — чтобы карточка «Тренировки» была ровно той же высоты, что и шаги */
-.act-hero{ display:grid; grid-template-columns:1.25fr 1fr; grid-auto-rows:1fr; gap:14px; align-items:stretch; margin-top:8px; }
-.steps-card{ flex:1.25; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
-.train-card{ flex:1; align-self:stretch; height:100%; min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; cursor:pointer; border:none; margin:0; color:var(--text); }
-.train-icon{ width:54px; height:54px; border-radius:18px; background:var(--chip); color:var(--chip-text); display:flex; align-items:center; justify-content:center; }
-.train-icon svg{ width:26px; height:26px; }
-.steps-ring-holder{ position:relative; width:148px; height:148px; margin:0 auto; }
-.steps-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-.steps-num{ font-size:24px; font-weight:900; letter-spacing:-.02em; }
-.steps-lbl{ font-size:11px; color:var(--text-secondary); font-weight:700; }
+.act-hero{ display:flex; flex-direction:column; gap:12px; margin-top:8px; }
+.steps-hero-row{ display:flex; align-items:center; gap:16px; }
+.steps-hero-ring{ position:relative; width:92px; height:92px; flex-shrink:0; }
+.steps-hero-ring-center{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--accent-2); }
+.steps-hero-ring-center svg{ width:28px; height:28px; }
+.steps-hero-info{ flex:1; min-width:0; }
+.steps-hero-title{ font-size:21px; font-weight:900; letter-spacing:-.02em; }
+.steps-hero-sub{ font-size:12.5px; color:var(--text-secondary); font-weight:600; margin-top:4px; }
+.steps-hero-btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:none; border-radius:16px; padding:14px; margin-top:14px; background:var(--chip); color:var(--chip-text); font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer; }
+.steps-hero-btn svg{ width:17px; height:17px; flex-shrink:0; }
 .act-quote{ margin-top:16px; border-radius:18px; padding:16px; background:var(--accent-soft); color:var(--accent-2); font-size:13.5px; font-weight:700; line-height:1.5; text-align:center; }
 .workout-item{ display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:1px solid var(--divider); }
 .workout-item:last-child{ border-bottom:none; }
@@ -539,6 +540,8 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 .import-row{ display:grid; grid-template-columns:1.35fr 1fr 1fr; gap:8px; margin-top:8px; }
 .import-row input{ border:none; background:var(--card); border-radius:10px; padding:10px; font-size:13px; color:var(--text); outline:none; min-width:0; }
 .import-row2{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:6px; margin-bottom:10px; }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.row2 .btn-secondary{ padding:14px; font-size:14.5px; }
 .import-row2 input{ border:none; background:var(--card-2); border-radius:10px; padding:9px; font-size:12.5px; color:var(--text); outline:none; min-width:0; }
 /* текст и плейсхолдеры инпутов всегда по теме (белый в тёмной, тёмный в светлой) */
 .plain-input, .import-row input, .import-row2 input{ -webkit-text-fill-color:var(--text); }
@@ -565,10 +568,6 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 .mini-btn{ display:inline-flex; align-items:center; gap:6px; padding:8px 13px; border-radius:12px; border:none; background:var(--chip); color:var(--chip-text); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; transition:transform .3s var(--spring), opacity .2s; }
 .mini-btn:active{ transform:scale(.93); opacity:.85; }
 .mini-btn svg{ width:14px; height:14px; }
-.steps-btns{ display:flex; gap:8px; justify-content:center; margin-top:12px; flex-wrap:wrap; }
-.steps-goal{ font-size:12px; color:var(--text-secondary); text-align:center; margin-top:8px; font-weight:600; }
-.train-name{ font-size:15px; font-weight:800; }
-.train-sub{ font-size:12px; color:var(--text-secondary); }
 .workout-icon{ width:44px; height:44px; border-radius:14px; background:var(--chip); color:var(--chip-text); display:flex; align-items:center; justify-content:center; flex:none; }
 .workout-icon svg{ width:20px; height:20px; }
 .workout-info{ flex:1; min-width:0; }
@@ -2858,35 +2857,37 @@ function renderActivityTab(){
   const ds = todayStr();
   const steps = daySteps(ds);
   const pct = Math.min(steps/STEPS_GOAL, 1);
-  const C = 2*Math.PI*62;
   const workouts = S.workoutLog[ds] || [];
   const burned = workoutsKcal(ds);
   return `
     <div class="topbar"><div class="topbar-title">Активность</div></div>
     <div class="screen">
       <div class="act-hero">
-        <div class="steps-card card rise">
-          <div class="steps-ring-holder">
-            <svg width="148" height="148" viewBox="0 0 148 148">
-              <circle cx="74" cy="74" r="62" fill="none" stroke="var(--card-2)" stroke-width="11"/>
-              <circle cx="74" cy="74" r="62" fill="none" stroke="url(#gradSteps)" stroke-width="11" stroke-linecap="round"
-                stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 74 74)"
-                style="transition:stroke-dashoffset .9s var(--ease-out)"/>
-              <defs><linearGradient id="gradSteps" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="var(--accent-1)"/><stop offset="100%" stop-color="var(--accent-2)"/>
-              </linearGradient></defs>
-            </svg>
-            <div class="steps-center"><div class="steps-num">${steps.toLocaleString('ru-RU')}</div><div class="steps-lbl">шагов</div></div>
+        <div class="card steps-hero-card rise">
+          <div class="steps-hero-row">
+            <div class="steps-hero-ring">
+              <svg width="92" height="92" viewBox="0 0 92 92">
+                <circle cx="46" cy="46" r="38" fill="none" stroke="var(--card-2)" stroke-width="9"/>
+                <circle cx="46" cy="46" r="38" fill="none" stroke="url(#gradSteps)" stroke-width="9" stroke-linecap="round"
+                  stroke-dasharray="${2*Math.PI*38}" stroke-dashoffset="${2*Math.PI*38*(1-pct)}" transform="rotate(-90 46 46)"
+                  style="transition:stroke-dashoffset .9s var(--ease-out)"/>
+                <defs><linearGradient id="gradSteps" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="var(--accent-1)"/><stop offset="100%" stop-color="var(--accent-2)"/>
+                </linearGradient></defs>
+              </svg>
+              <div class="steps-hero-ring-center">${ic('shoe')}</div>
+            </div>
+            <div class="steps-hero-info">
+              <div class="steps-hero-title">${steps.toLocaleString('ru-RU')} шагов</div>
+              <div class="steps-hero-sub">цель ${STEPS_GOAL.toLocaleString('ru-RU')}${stepsKcal(ds)>0?' · ≈ '+stepsKcal(ds)+' ккал':''}</div>
+            </div>
           </div>
-          <div class="steps-goal">цель ${STEPS_GOAL.toLocaleString('ru-RU')}${stepsKcal(ds)>0?' · ≈ '+stepsKcal(ds)+' ккал':''}</div>
-          <div class="steps-btns">
-            <button class="mini-btn" data-act="importSteps">${ic('shoe')} Записать шаги</button>
-          </div>
+          <button class="steps-hero-btn" data-act="importSteps">${ic('shoe')} Записать шаги</button>
         </div>
-        <button class="train-card card rise" style="animation-delay:.07s" data-act="openWorkouts">
-          <div class="train-icon">${ic('dumbbell')}</div>
-          <div class="train-name">Тренировки</div>
-          <div class="train-sub">${workouts.length? workouts.length+' сегодня · '+burned+' ккал':'Добавить →'}</div>
+        <button class="action-btn rise" style="animation-delay:.07s" data-act="openWorkouts">
+          <div class="action-icon">${ic('dumbbell')}</div>
+          <div><div class="action-title">Тренировки</div><div class="action-sub">${workouts.length? workouts.length+' сегодня · '+burned+' ккал':'Добавить тренировку'}</div></div>
+          <div class="action-chevron">›</div>
         </button>
       </div>
       <div class="act-quote rise" style="animation-delay:.12s">Высокая активность — ключ к красивому и сухому лицу. Начни больше ходить и тренироваться</div>
@@ -3947,7 +3948,7 @@ function dayEditorHtml(ds){
         <button class="swipe-del" data-act="delFood" data-arg="${i}">${TRASH_SVG}</button>
       </div>`).join('') : `<div class="empty-hint">В этот день записей нет — добавь еду</div>`)
     + `<button class="btn-primary" style="margin-top:14px" data-act="openAddFoodForDay">Добавить еду</button>
-    <div class="import-row2" style="margin-top:10px">
+    <div class="row2" style="margin-top:10px">
       <button class="btn-secondary" data-act="importSteps">Шаги</button>
       <button class="btn-secondary" data-act="openWorkouts">Тренировки</button>
     </div>`;
