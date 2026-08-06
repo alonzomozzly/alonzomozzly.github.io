@@ -236,6 +236,32 @@ button:active, .pressable:active{ transform:scale(.96); transition-duration:.08s
 .macro-val{ font-size:16px; font-weight:800; }
 .macro-goal{ font-size:12px; font-weight:600; color:var(--text); opacity:.45; }
 .macro-lbl{ font-size:11.5px; color:var(--text-secondary); margin-top:2px; font-weight:600; }
+
+/* ---------- Карточка калорий (главный экран) ---------- */
+.kcal-card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 14px 18px; margin-top:4px; }
+.kcal-card-row{ display:flex; align-items:center; justify-content:space-between; gap:2px; }
+.kcal-side{ flex:0 0 70px; text-align:center; }
+.kcal-side-val{ font-size:19px; font-weight:800; letter-spacing:-.02em; }
+.kcal-side-lbl{ font-size:11.5px; color:var(--text-secondary); font-weight:600; margin-top:3px; }
+.kcal-side.burn .kcal-side-val{ color:var(--green); }
+.kcal-gauge{ position:relative; width:172px; height:172px; flex-shrink:0; }
+.kcal-gauge-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.kcal-gauge-val{ font-size:36px; font-weight:900; letter-spacing:-.03em; line-height:1; }
+.kcal-gauge-lbl{ font-size:12px; color:var(--text-secondary); font-weight:600; margin-top:7px; text-align:center; max-width:104px; line-height:1.25; }
+.kcal-card-foot{ display:flex; align-items:center; justify-content:center; gap:5px; margin-top:14px; font-size:12.5px; color:var(--text-secondary); font-weight:600; text-align:center; }
+
+/* ---------- Полосы БЖУ ---------- */
+:root{ --macro-carbs:#ffab3d; --macro-protein:#ff5470; --macro-fat:#4c9eff; }
+:root.dark{ --macro-carbs:#ffb85c; --macro-protein:#ff7086; --macro-fat:#5aa8ff; }
+.macro-bars{ display:flex; gap:10px; margin-top:14px; }
+.macro-bar{ flex:1; background:var(--card); border-radius:16px; padding:13px 11px 13px; box-shadow:var(--shadow); min-width:0; }
+.macro-bar-head{ display:flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.macro-bar-ic{ font-size:13px; line-height:1; flex-shrink:0; }
+.macro-bar-track{ height:6px; border-radius:6px; background:var(--card-2); overflow:hidden; }
+.macro-bar-fill{ height:100%; border-radius:6px; transition:width .7s var(--ease-out); }
+.macro-bar-nums{ margin-top:9px; font-size:12.5px; font-weight:700; white-space:nowrap; }
+.macro-bar-nums span{ color:var(--text-secondary); font-weight:600; }
+.topbar-date{ font-size:12.5px; color:var(--text-tertiary); font-weight:600; margin-top:2px; }
 .protein-hint{ margin-top:10px; text-align:center; font-size:13px; font-weight:700; }
 
 .actions-grid{ display:flex; flex-direction:column; gap:12px; margin-top:20px; }
@@ -2540,6 +2566,14 @@ function renderHome(){
   const targetFat = mt.fat;
   const targetCarbs = mt.carbs;
   const protein = dayMacro(ds,'p');
+  const carbsVal = dayMacro(ds,'c');
+  const fatVal = dayMacro(ds,'f');
+  const pctBar = (v,g)=> g>0 ? Math.min(100, Math.round(v/g*100)) : 0;
+  const wd = new Date(ds+'T00:00:00').toLocaleDateString('ru-RU',{weekday:'long'});
+  const dateLine = `${wd.charAt(0).toUpperCase()+wd.slice(1)}, ${fmtDate(ds)}`;
+  const arcFrac = 0.72, gaugeR = 78, gaugeCirc = 2*Math.PI*gaugeR;
+  const arcLen = gaugeCirc*arcFrac;
+  const gaugeRotate = 90 + 360*(1-arcFrac)/2;
   const hour = new Date().getHours();
   let warn = '';
   const warnKey = `warnDismissed_${todayStr()}`;
@@ -2553,35 +2587,60 @@ function renderHome(){
 
   return `
     <div class="topbar">
-      <div class="topbar-greeting">Привет, ${escapeHtml(p.name)}!</div>
+      <div>
+        <div class="topbar-greeting">Привет, ${escapeHtml(p.name)}!</div>
+        <div class="topbar-date">${dateLine}</div>
+      </div>
       ${si.display>0?(()=>{ const m = todayStr().slice(0,7); const used = [...si.frozen].filter(x=>x.slice(0,7)===m).length; return `<div class="topbar-streak"><div class="streak-main"><span class="streak-fire">🔥</span>${si.display}-й день подряд</div><div class="streak-sub">заморозок осталось: ${Math.max(0,3-used)}</div></div>`; })():''}
     </div>
     <div class="screen">
-      <div class="ring-wrap">
-        <div class="ring-label">${hasEaten?'Осталось на сегодня':'Сегодня цель'}</div>
-        <div class="ring-svg-holder">
-          <svg width="230" height="230" viewBox="0 0 230 230">
-            <circle cx="115" cy="115" r="95" fill="none" stroke="var(--card-2)" stroke-width="14"/>
-            <circle cx="115" cy="115" r="95" fill="none" stroke="url(#gradRing)" stroke-width="14"
-              stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${dash}"
-              transform="rotate(-90 115 115)" style="transition:stroke-dashoffset .9s var(--ease-out)"/>
-            <defs><linearGradient id="gradRing" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="var(--accent-1)"/><stop offset="100%" stop-color="var(--accent-2)"/>
-            </linearGradient></defs>
-          </svg>
-          <div class="ring-center">
-            <div class="ring-kcal">${hasEaten?remaining:goal}</div>
-            <div class="ring-kcal-unit">ккал</div>
+      <div class="kcal-card rise">
+        <div class="kcal-card-row">
+          <div class="kcal-side">
+            <div class="kcal-side-val">${consumed}</div>
+            <div class="kcal-side-lbl">Съедено</div>
+          </div>
+          <div class="kcal-gauge">
+            <svg width="172" height="172" viewBox="0 0 190 190">
+              <circle cx="95" cy="95" r="${gaugeR}" fill="none" stroke="var(--card-2)" stroke-width="15"
+                stroke-linecap="round" stroke-dasharray="${arcLen} ${gaugeCirc}"
+                transform="rotate(${gaugeRotate} 95 95)"/>
+              <circle cx="95" cy="95" r="${gaugeR}" fill="none" stroke="url(#gradRing)" stroke-width="15"
+                stroke-linecap="round" stroke-dasharray="${arcLen*pct} ${gaugeCirc}"
+                transform="rotate(${gaugeRotate} 95 95)" style="transition:stroke-dasharray .9s var(--ease-out)"/>
+              <defs><linearGradient id="gradRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="var(--accent-1)"/><stop offset="100%" stop-color="var(--accent-2)"/>
+              </linearGradient></defs>
+            </svg>
+            <div class="kcal-gauge-center">
+              <div class="kcal-gauge-val">${hasEaten?remaining:goal}</div>
+              <div class="kcal-gauge-lbl">${hasEaten?'ккал осталось':'ккал цель'}</div>
+            </div>
+          </div>
+          <div class="kcal-side burn">
+            <div class="kcal-side-val">${burned}</div>
+            <div class="kcal-side-lbl">Сожжено</div>
           </div>
         </div>
-        ${burned>0?`<div class="ring-burn">+ ${burned} ккал сожжено активностью</div>`:''}
-        <div class="ring-sub">Для снижения веса на ~${rateWeek||0} кг в неделю</div>
+        <div class="kcal-card-foot">Для снижения веса на ~${rateWeek||0} кг в неделю</div>
       </div>
 
-      <div class="macros-row">
-        <div class="macro-pill rise" style="animation-delay:.03s"><div class="macro-val">${protein}<span class="macro-goal"> / ${targetProtein}</span> г</div><div class="macro-lbl">Белки</div></div>
-        <div class="macro-pill rise" style="animation-delay:.08s"><div class="macro-val">${dayMacro(ds,'c')}<span class="macro-goal"> / ${targetCarbs}</span> г</div><div class="macro-lbl">Углеводы</div></div>
-        <div class="macro-pill rise" style="animation-delay:.13s"><div class="macro-val">${dayMacro(ds,'f')}<span class="macro-goal"> / ${targetFat}</span> г</div><div class="macro-lbl">Жиры</div></div>
+      <div class="macro-bars">
+        <div class="macro-bar rise" style="animation-delay:.03s">
+          <div class="macro-bar-head"><span class="macro-bar-ic">🌾</span>Углеводы</div>
+          <div class="macro-bar-track"><div class="macro-bar-fill" style="width:${pctBar(carbsVal,targetCarbs)}%;background:var(--macro-carbs)"></div></div>
+          <div class="macro-bar-nums">${carbsVal}<span> / ${targetCarbs} г</span></div>
+        </div>
+        <div class="macro-bar rise" style="animation-delay:.08s">
+          <div class="macro-bar-head"><span class="macro-bar-ic">🍗</span>Белки</div>
+          <div class="macro-bar-track"><div class="macro-bar-fill" style="width:${pctBar(protein,targetProtein)}%;background:var(--macro-protein)"></div></div>
+          <div class="macro-bar-nums">${protein}<span> / ${targetProtein} г</span></div>
+        </div>
+        <div class="macro-bar rise" style="animation-delay:.13s">
+          <div class="macro-bar-head"><span class="macro-bar-ic">🥑</span>Жиры</div>
+          <div class="macro-bar-track"><div class="macro-bar-fill" style="width:${pctBar(fatVal,targetFat)}%;background:var(--macro-fat)"></div></div>
+          <div class="macro-bar-nums">${fatVal}<span> / ${targetFat} г</span></div>
+        </div>
       </div>
 
       <div class="actions-grid">
