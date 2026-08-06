@@ -2651,7 +2651,7 @@ function renderHome(){
         </button>
         <button class="action-btn rise" style="animation-delay:.1s" data-act="openEdema">
           <div class="action-icon">${ic('drop')}</div>
-          <div><div class="action-title">Контроль отеков</div><div class="action-sub">Соль, вода, натрий/калий, активность</div></div>
+          <div><div class="action-title">Контроль отеков</div><div class="action-sub">Соль, вода и активность</div></div>
           <div class="action-chevron">›</div>
         </button>
         <button class="action-btn rise" style="animation-delay:.15s" data-act="openLogWeight">
@@ -2683,9 +2683,9 @@ function getSmartAdvice(){
   const targetProtein = macroTargets(p).protein;
   const days3 = lastDays(4).slice(1).filter(x=>dayItems(x).length>0);
   if(dayItems(ds).length===0 && days3.length===0)
-    return `Начни с первого приёма пищи. Цель на день — ${goal} ккал и около ${targetProtein} г белка, чтобы сохранить мышцы на сушке`;
+    return `Начни с первого приёма пищи. Цель на день — ${goal} ккал и около ${targetProtein} г белка, чтобы сохранить мышцы`;
   if(daySalt(ds) > SALT_LIMIT)
-    return `Сегодня уже ${daySalt(ds)} г соли — выше границы ${SALT_LIMIT} г. Вечером выбирай пресную еду и пей воду по жажде, иначе завтра будет задержка воды и отёк`;
+    return `Сегодня уже ${daySalt(ds)} г соли: выше границы ${SALT_LIMIT} г. Вечером выбирай пресную еду и пей воду по жажде, иначе завтра будет задержка воды и отёк`;
   if(days3.length>=2){
     const avgP = Math.round(days3.reduce((s,x)=>s+dayMacro(x,'p'),0)/days3.length);
     if(avgP < targetProtein*0.7)
@@ -2694,16 +2694,16 @@ function getSmartAdvice(){
     if(avgDef < -1000)
       return `Средний дефицит за последние дни около ${Math.abs(avgDef)} ккал — это слишком много. Так теряются мышцы и замедляется обмен. Подними калорийность ближе к цели`;
     if(avgDef > 250)
-      return `Последние дни в среднем +${avgDef} ккал к норме. Попробуй убрать перекусы после ужина — обычно именно они ломают дефицит`;
+      return `Последние дни в среднем +${avgDef} ккал к норме. Попробуй убрать перекусы после обеда и ужина, обычно именно они ломают дефицит`;
   }
   const water = dayWater(ds), norm = waterNormMl();
   if(new Date().getHours()>=16 && water < norm*0.4)
     return `К вечеру выпито только ${(water/1000).toFixed(1)} л из ${(norm/1000).toFixed(1)} л. Равномерно добери норму, но не заливай всё перед сном`;
   const steps3 = lastDays(3).reduce((s,x)=>s+daySteps(x),0)/3;
   if(steps3 < 4000)
-    return `Шагов в посление дни маловато. Прогулка 30–40 минут в день заметно ускорит сушку и уберёт отёчность`;
+    return `Шагов в посление дни маловато. Прогулки по 30–40 минут в день заметно ускорят сушку и уберут отёчность`;
   const si = streakInfo();
-  return `Ты на верном пути${si.display>1?` — уже ${si.display}-й день подряд`:''}. Держи белок около ${targetProtein} г, соль до ${SALT_LIMIT} г и не пропускай шаги`;
+  return `Ты на верном пути${si.display>1?` — уже ${si.display}-й день подряд`:''}. Держи белок около ${targetProtein} г, соль до ${SALT_LIMIT} г и не пропускай шаги!`;
 }
 
 /* ================= Экран достижения цели ================= */
@@ -2752,7 +2752,6 @@ function edemaHtml(){
   else if(kNa >= 4){ ratioState='good'; ratioLabel='Идеальный'; ratioNote='Калия в 4–5 раз больше натрия — идеальный баланс, лишняя вода не задерживается'; }
   else if(kNa >= 2){ ratioState='mid'; ratioLabel='В норме'; ratioNote='Калия в 2–3 раза больше натрия — неплохо, но до идеала (4–5 к 1) добавь бананы, авокадо, шпинат, зелень или выпей добавку'; }
   else { ratioState='bad'; ratioLabel='Мало'; ratioNote='Калия слишком мало по отношению к натрию — это задерживает воду. Добавь картофель, бананы, авокадо, шпинат или курагу'; }
-  const covNote = cov==='partial' ? '<div class="metric-note" style="margin-top:6px;opacity:.8">У части продуктов сегодня нет данных о натрии/калии — показаны только те, где данные есть</div>' : '';
   const act = activityRating(ds);
   const wLitre = (water/1000).toFixed(water%1000===0?0:1);
   const nLitre = (norm/1000).toFixed(norm%1000===0?0:1);
@@ -2784,7 +2783,7 @@ function edemaHtml(){
     <div class="metric-card rise clickable" style="animation-delay:.12s" data-act="edemaToActivity">
       <div class="metric-lbl">Активность:</div>
       <div class="metric-big"><span class="val" style="color:${act.color}">${act.label}</span></div>
-      <div class="metric-note">${daySteps(ds)>0?daySteps(ds).toLocaleString('ru-RU')+' шагов':'Шаги ещё не записаны'} · сожжено ${dayBurned(ds)} ккал (шаги + тренировки)</div>
+      <div class="metric-note">${daySteps(ds)>0?daySteps(ds).toLocaleString('ru-RU')+' шагов':'Шаги ещё не записаны'} · сожжено ${dayBurned(ds)} ккал</div>
       <div class="action-chevron" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:32px;font-weight:600;color:rgba(255,255,255,.65)">›</div>
     </div>`;
 }
@@ -2890,7 +2889,7 @@ function renderActivityTab(){
           <div class="train-sub">${workouts.length? workouts.length+' сегодня · '+burned+' ккал':'Добавить →'}</div>
         </button>
       </div>
-      <div class="act-quote rise" style="animation-delay:.12s">Высокая активность — ключ к красивому и сухому лицу. Начни больше ходить и тренироваться, это очень важно</div>
+      <div class="act-quote rise" style="animation-delay:.12s">Высокая активность — ключ к красивому и сухому лицу. Начни больше ходить и тренироваться</div>
       ${workouts.length?`<div class="section-title">Сегодня</div>${workouts.map((w,i)=>workoutItemHtml(w,i)).join('')}`:''}
     </div>`;
 }
@@ -3919,7 +3918,7 @@ function renderStatsTab(){
         <div class="chart-holder">${weightChartSvg(w30.length>=2? w30 : wAll, slope)}</div>
       </div>
 
-      <div class="section-title">Каленарь сушки</div>
+      <div class="section-title">Календарь сушки</div>
       <div class="card rise" style="animation-delay:.2s">
         <div class="calendar-grid">${cal}</div>
         <div class="cal-legend"><span><i class="cal-dot ok"></i>в норме</span><span><i class="cal-dot warn"></i>отклонение</span><span><i class="cal-dot bad"></i>перебор</span><span><i class="cal-dot frozen"></i>заморозка</span></div>
@@ -4102,7 +4101,7 @@ ACTIONS.setAccent = (arg)=>{ S.theme.accent = arg; save(); applyTheme(); renderT
 ACTIONS.openImport = ()=>{
   openSheet(`
     <div class="sheet-title">Импорт истории сушки</div>
-    <div class="modal-text">Уже какое-то время на сушке? Добавь прошлые дни — прилоение восстановит стрик, графики, средний дефицит и прогноз. Обязательны только калории; вес и БЖУ — по желанию, с ними статистика будет детальнее</div>
+    <div class="modal-text">Уже какое-то время на сушке? Добавь прошлые дни, я восстановлю стрик, графики, средний дефицит и прогноз. Обязательны только калории, вес и БЖУ по желанию, но с ними статистика будет детальнее</div>
     <div class="actions-grid" style="margin-top:14px">
       <button class="btn-primary" data-act="importByDays">Заполнить по дням</button>
       <button class="btn-secondary" data-act="importByText">Вставить текстом (хоть 200 дней)</button>
