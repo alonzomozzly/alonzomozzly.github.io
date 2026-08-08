@@ -88,6 +88,25 @@
 }
 :root.accent-mono .action-btn.primary .action-icon{ color:#fff; }
 
+/* Режим «Поддержание формы» — ледяной спокойный акцент поверх любой выбранной темы,
+   чтобы интерфейс визуально «переключился» на новую задачу. Режим «Сушка» использует
+   обычный акцент пользователя (по умолчанию агрессивный неоново-оранжевый) */
+:root.phase-maintain{
+  --accent-1:#8fd7ff; --accent-2:#1f6fae; --accent:#3f96d1; --accent-soft:#e6f5ff; --on-accent:#ffffff;
+}
+:root.dark.phase-maintain{ --accent-soft:#112433; --accent:#7fc3ea; --accent-1:#a3ddf7; --accent-2:#4d9fd6; }
+:root.phase-maintain .btn-primary{ box-shadow:0 10px 24px -8px rgba(31,111,174,.5); }
+:root.phase-maintain .action-btn.primary{
+  background:linear-gradient(115deg,#8fd7ff 0%, #2a7ab8 36%, #ffffff 50%, #2a7ab8 64%, #164a70 100%);
+  background-size:280% 280%; box-shadow:0 10px 26px -8px rgba(31,111,174,.55);
+}
+.phase-switch{ display:flex; gap:4px; padding:4px; background:var(--card-2); border-radius:16px; margin:14px 0 4px; }
+.phase-switch-opt{ flex:1; text-align:center; padding:10px 6px; border-radius:12px; font-size:13.5px; font-weight:700;
+  color:var(--text-secondary); background:transparent; border:none; cursor:pointer; transition:background .3s var(--ios), color .3s var(--ios), box-shadow .3s var(--ios); }
+.phase-switch-opt.active.cut{ background:linear-gradient(115deg,#ffc247,#ff6a1e); color:#1a1200; box-shadow:0 6px 16px -4px rgba(255,120,20,.5); }
+.phase-switch-opt.active.maintain{ background:linear-gradient(115deg,#8fd7ff,#1f6fae); color:#ffffff; box-shadow:0 6px 16px -4px rgba(31,111,174,.5); }
+.reverse-note{ font-size:12px; color:var(--text-secondary); text-align:center; margin-top:2px; }
+
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html{ height:100%; margin:0; }
 body{ height:var(--tg-viewport-stable-height, 100%); min-height:0; margin:0; }
@@ -1161,7 +1180,11 @@ let S = {
   goalShown:false,
   stamps:{},           // метки времени правок — нужны для слияния между устройствами
   tomb:{},             // id удалённых записей — чтобы удалённое не возвращалось
-  uid:''               // владелец данных = id Telegram-аккаунта
+  uid:'',              // владелец данных = id Telegram-аккаунта
+  phase:'cut',          // 'cut' — экстремальная сушка, 'maintain' — поддержание формы
+  reverse:null,         // реверсивный протокол выхода из сушки: {startDs,fromKcal,fromCarbs}
+  skinLog:{},           // {'YYYY-MM-DD': {status:'calm'|'flare'|'dry', note}}
+  retinoidLog:{}        // {'YYYY-MM-DD': true} — дни нанесения ретиноидов
 };
 let ui = { tab:'home', settingsTab:'profile' };
 
@@ -1884,7 +1907,47 @@ function barcodeVariants(code){
   if(c.length<13) add(c.padStart(13,'0'));
   return v.slice(0,4);
 }
+/* Локальный кэш штрихкодов: повторное сканирование уже известного товара
+   отдаёт результат мгновенно, без похода в сеть (главный источник задержки) */
+const BARCODE_CACHE_KEY = 'barcode_cache_v1';
+const BARCODE_CACHE_TTL = 30*24*3600e3; // 30 дней
+function readBarcodeCache(){ try{ return JSON.parse(localStorage.getItem(BARCODE_CACHE_KEY)||'{}'); }catch(e){ return {}; } }
+function getBarcodeCache(code){
+  const c = readBarcodeCache();
+  const e = c[code];
+  if(e && (Date.now()-e.at) < BARCODE_CACHE_TTL) return e.food;
+  return null;
+}
+function setBarcodeCache(code, food){
+  try{
+    const c = readBarcodeCache();
+    c[code] = { food, at: Date.now() };
+    const keys = Object.keys(c);
+    /* кэш не должен расти бесконечно — держим не больше 500 последних штрихкодов */
+    if(keys.length>500) keys.sort((a,b)=>c[a].at-c[b].at).slice(0, keys.length-500).forEach(k=>delete c[k]);
+    localStorage.setItem(BARCODE_CACHE_KEY, JSON.stringify(c));
+  }catch(e){}
+}
+/* Раньше ждали ответа ВСЕХ зеркал (Promise.allSettled) прежде чем показать
+   результат — если товар нашёлся на первом же зеркале за 300мс, всё равно
+   ждали самое медленное зеркало (до 9с). Теперь берём первый успешный ответ */
+function firstMatch(promises, isGood){
+  return new Promise(resolve=>{
+    let remaining = promises.length, done = false;
+    if(!remaining) return resolve(null);
+    promises.forEach(p=>{
+      p.then(v=>{
+        if(!done && isGood(v)){ done = true; resolve(v); }
+      }).catch(()=>{}).then(()=>{
+        remaining--;
+        if(remaining===0 && !done) resolve(null);
+      });
+    });
+  });
+}
 async function lookupBarcodeOFF(code){
+  const cached = getBarcodeCache(code);
+  if(cached) return { ok:true, food:cached };
   const codes = barcodeVariants(code);
   if(!codes.length) return { ok:false, reason:'badcode' };
   const reqs = [];
@@ -1893,16 +1956,22 @@ async function lookupBarcodeOFF(code){
     /* старый v0 иногда отдаёт товар, который v2 не видит */
     if(ci===0) reqs.push('https://world.openfoodfacts.org/api/v0/product/'+c+'.json');
   });
-  const settled = await Promise.allSettled(reqs.map(u=>offFetchJson(u, 9000)));
+  const promises = reqs.map(u=>offFetchJson(u, 9000));
+  const first = await firstMatch(promises, v=> !!(v && v.product && offToFood(v.product)));
+  if(first){
+    const f = offToFood(first.product);
+    setBarcodeCache(code, f);
+    return { ok:true, food:f };
+  }
+  /* быстрого совпадения нет — ждём все ответы, чтобы честно отличить
+     «товара нет в базе» от «есть карточка, но КБЖУ не заполнены» */
+  const settled = await Promise.allSettled(promises);
   let anyOk = false, foundName = '';
   for(const r of settled){
     if(r.status!=='fulfilled' || !r.value) continue;
     anyOk = true;
     const prod = r.value.product;
     if(!prod) continue;
-    const f = offToFood(prod);
-    if(f) return { ok:true, food:f };
-    /* карточка есть, но КБЖУ никто не заполнил — честно скажем об этом */
     if(!foundName) foundName = String(prod.product_name_ru || prod.product_name || prod.brands || '').trim();
   }
   if(!anyOk) throw new Error('network');
@@ -1982,13 +2051,30 @@ const GOAL_PCT = { maintain:0, slow:0.10, moderate:0.20, fast:0.28 };
    (кольцо, остаток, белок, календарь, аналитика, графики, прогноз и советы)
    считается от его чисел, а не от формулы */
 function customOn(p){ return !!(p && p.custom && p.custom.on && p.custom.kcal > 0); }
-function goalRateKgWeek(p){
-  if(customOn(p)) return Math.round((tdee(p) - goalCalories(p))*7/7700*20)/20;
-  return Math.round(tdee(p)*(GOAL_PCT[p.goal]||0)*7/7700*20)/20;
+/* ================= Режим «Поддержание» + реверсивный протокол =================
+   При переходе «Сушка» → «Поддержание» калораж не скачет резко: раз в неделю
+   +100 ккал и +20 г углеводов, пока не дойдём до полной нормы поддержания */
+function maintainTargetKcal(p){ return Math.round(tdee(p)/10)*10; }
+function maintainTargetCarbsG(p){ const tw = (p.targetWeight>0 ? p.targetWeight : p.weight); return Math.round(tw*3.5); }
+function reverseWeeksElapsed(){
+  if(!S.reverse || !S.reverse.startDs) return 0;
+  const days = Math.floor((Date.now() - new Date(S.reverse.startDs+'T00:00:00').getTime())/86400000);
+  return Math.max(0, Math.floor(days/7));
 }
 function goalCalories(p){
+  if(S.phase==='maintain'){
+    const target = maintainTargetKcal(p);
+    if(!S.reverse) return target;
+    const w = reverseWeeksElapsed();
+    return Math.min(target, Math.round((S.reverse.fromKcal + w*100)/10)*10);
+  }
   if(customOn(p)) return Math.round(p.custom.kcal);
   const t = tdee(p)*(1-(GOAL_PCT[p.goal]||0)) + (p.calorieAdjust||0); return Math.round(t/10)*10;
+}
+function goalRateKgWeek(p){
+  if(S.phase==='maintain') return 0;
+  if(customOn(p)) return Math.round((tdee(p) - goalCalories(p))*7/7700*20)/20;
+  return Math.round(tdee(p)*(GOAL_PCT[p.goal]||0)*7/7700*20)/20;
 }
 /* умные нормы БЖУ: при большом лишнем весе белок/жир считаем от «расчётного» веса
    (норма BMI 22 + четверть избытка), а не от фактического — жировая масса белок не требует.
@@ -2008,6 +2094,16 @@ function autoMacroTargets(p){
   return { protein, fat, carbs: Math.max(carbs, 0) };
 }
 function macroTargets(p){
+  if(S.phase==='maintain'){
+    const auto = autoMacroTargets(p);
+    const targetCarbs = maintainTargetCarbsG(p);
+    let carbs = targetCarbs;
+    if(S.reverse){
+      const w = reverseWeeksElapsed();
+      carbs = Math.min(targetCarbs, S.reverse.fromCarbs + w*20);
+    }
+    return { protein: auto.protein, fat: auto.fat, carbs: Math.round(carbs) };
+  }
   if(customOn(p)){
     const c = p.custom, auto = autoMacroTargets(p);
     return {
@@ -2018,6 +2114,24 @@ function macroTargets(p){
   }
   return autoMacroTargets(p);
 }
+/* true, пока реверсивный протокол ещё не доехал до полной нормы поддержания */
+function reverseInProgress(p){
+  if(S.phase!=='maintain' || !S.reverse) return false;
+  return goalCalories(p) < maintainTargetKcal(p);
+}
+ACTIONS.setPhase = (arg)=>{
+  const p = S.profile; if(!p) return;
+  if(arg===S.phase){ return; }
+  if(arg==='maintain'){
+    /* фиксируем стартовую точку реверсивного протокола, пока ещё считаем как на сушке */
+    S.reverse = { startDs: todayStr(), fromKcal: goalCalories(p), fromCarbs: macroTargets(p).carbs };
+    S.phase = 'maintain';
+  } else {
+    S.phase = 'cut';
+    S.reverse = null;
+  }
+  save(true); haptic('ok'); renderTab();
+};
 
 function dayItems(ds){ return S.foodLog[ds] || []; }
 function dayTotal(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.kcal||0),0)); }
@@ -2082,13 +2196,15 @@ const app = document.getElementById('app');
 /* приводим состояние к рабочему виду: битая/частичная копия (старый бэкап,
    неполное облако) больше не роняет рендер на первом же обращении к полю */
 function normalizeState(){
-  ['foodLog','waterLog','stepsLog','workoutLog','foodFreq','stamps','tomb'].forEach(k=>{
+  ['foodLog','waterLog','stepsLog','workoutLog','foodFreq','stamps','tomb','skinLog','retinoidLog'].forEach(k=>{
     if(!S[k] || typeof S[k]!=='object' || Array.isArray(S[k])) S[k] = {};
   });
   ['weightLog','customFoods'].forEach(k=>{ if(!Array.isArray(S[k])) S[k] = []; });
   if(!S.theme || typeof S.theme!=='object') S.theme = {dark:null, accent:'orange'};
   if(typeof S.theme.accent!=='string') S.theme.accent = 'orange';
   if(S.profile && typeof S.profile!=='object') S.profile = null;
+  if(S.phase!=='cut' && S.phase!=='maintain') S.phase = 'cut';
+  if(S.reverse && typeof S.reverse!=='object') S.reverse = null;
   S.goalShown = !!S.goalShown;
 }
 function applyTheme(){
@@ -2102,6 +2218,7 @@ function applyTheme(){
   root.classList.toggle('accent-green', S.theme.accent==='green');
   root.classList.toggle('accent-blue', S.theme.accent==='blue');
   root.classList.toggle('accent-mono', S.theme.accent==='mono');
+  root.classList.toggle('phase-maintain', S.phase==='maintain');
 }
 function isDark(){ return document.documentElement.classList.contains('dark'); }
 
@@ -2607,6 +2724,10 @@ function renderHome(){
       warn = `<div class="warn-card red rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Пока что дефицит выходит слишком большим. Если еды почти нет, замедляется обмен веществ, теряются мышцы и повышается кортизол → больше отёков. Не забудь поесть сегодня</span></div>`;
     else if(consumed > goal + 250)
       warn = `<div class="warn-card rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">!</span><span>Сегодня ${consumed - goal} ккал сверх нормы. Ничего страшного — просто вернись в ритм завтра</span></div>`;
+    else if(hour>=20 && !S.skinLog[ds])
+      warn = `<div class="warn-card rise" id="warnCard" style="position:relative" data-act="openSkin"><button onclick="event.stopPropagation();sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">🧴</span><span>Оцени состояние кожи сегодня — займёт секунду</span></div>`;
+    else if(!S.retinoidLog[ds] && S.retinoidLog[todayStr(new Date(Date.now()-86400000))])
+      warn = `<div class="warn-card rise" id="warnCard" style="position:relative"><button onclick="sessionStorage.setItem('${warnKey}','1');document.getElementById('warnCard').remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:18px;line-height:1;cursor:pointer;color:inherit;opacity:.55">×</button><span class="warn-ic">☀️</span><span>Вчера был ретиноид — сегодня утром обязателен SPF 50+, кожа фоточувствительна</span></div>`;
   }
 
   return `
@@ -2618,6 +2739,11 @@ function renderHome(){
       ${si.display>0?(()=>{ const m = todayStr().slice(0,7); const used = [...si.frozen].filter(x=>x.slice(0,7)===m).length; return `<div class="topbar-streak"><div class="streak-main"><span class="streak-fire">🔥</span>${si.display}-й день подряд</div><div class="streak-sub">заморозок осталось: ${Math.max(0,3-used)}</div></div>`; })():''}
     </div>
     <div class="screen">
+      <div class="phase-switch rise">
+        <button class="phase-switch-opt cut ${S.phase==='cut'?'active':''}" data-act="setPhase" data-arg="cut">🔥 Экстремальная сушка</button>
+        <button class="phase-switch-opt maintain ${S.phase==='maintain'?'active':''}" data-act="setPhase" data-arg="maintain">❄️ Поддержание формы</button>
+      </div>
+      ${reverseInProgress(p) ? `<div class="reverse-note">Реверсивный выход из сушки: +100 ккал и +20 г углей в неделю до нормы поддержания</div>` : ''}
       <div class="kcal-card rise">
         <div class="kcal-card-row">
           <div class="kcal-side">
@@ -2647,7 +2773,7 @@ function renderHome(){
             <div class="kcal-side-lbl">Сожжено</div>
           </div>
         </div>
-        <div class="kcal-card-foot">Для снижения веса на ~${rateWeek||0} кг в неделю</div>
+        <div class="kcal-card-foot">${S.phase==='maintain' ? (reverseInProgress(p) ? 'Плавно выходим на норму поддержания' : 'Норма поддержания формы') : `Для снижения веса на ~${rateWeek||0} кг в неделю`}</div>
       </div>
 
       <div class="macro-bars">
@@ -2681,6 +2807,11 @@ function renderHome(){
           <div class="action-icon">${ic('scale')}</div>
           <div class="action-title">Записать вес</div>
         </button>
+        <button class="bento-tile rise" style="animation-delay:.18s" data-act="openSkin">
+          <div class="action-icon">🧴</div>
+          <div class="action-title">Здоровье кожи</div>
+          <div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${S.skinLog[ds] && S.skinLog[ds].status==='flare' ? 'var(--red)' : 'var(--text-secondary)'}">${skinStatusLabel(S.skinLog[ds] && S.skinLog[ds].status)}</div>
+        </button>
       </div>
       ${warn}
       <div class="advice-card rise" style="animation-delay:.2s">
@@ -2711,7 +2842,7 @@ function getSmartAdvice(){
   if(days3.length>=2){
     const avgP = Math.round(days3.reduce((s,x)=>s+dayMacro(x,'p'),0)/days3.length);
     if(avgP < targetProtein*0.7)
-      return `За последние дни белка в среднем ${avgP} г при цели ${targetProtein} г. Добавляй творог, курицу или протеиновый коктейль в каждый приём пищи`;
+      return `За последние дни белка в среднем ${avgP} г при цели ${targetProtein} г. Добавляй яичный белок, курицу, индейку или изолят в каждый приём пищи${skinDairySensitive()?' — без творога и молочки, раз кожа реагирует на казеин':''}`;
     const avgDef = Math.round(days3.reduce((s,x)=>s+dayGoalDelta(x),0)/days3.length);
     if(avgDef < -1000)
       return `Средний дефицит за последние дни около ${Math.abs(avgDef)} ккал — это слишком много. Так теряются мышцы и замедляется обмен. Подними калорийность ближе к цели`;
@@ -2874,6 +3005,130 @@ ACTIONS.infoWater = ()=> openModal(`
   <div class="modal-text">Пей воду по мере жажды и не злоупотребляй ей за час до сна</div>
   <div class="modal-text">Не рекомендую пить больше или меньше назначенной нормы — это может привести к отёкам</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
+
+/* ================= Контроль качества кожи (Anti-Acne Tracker) =================
+   Триггерная система: сопоставляем еду за день со скрытыми раздражителями
+   (молочный белок / казеин, быстрые углеводы высокого ГИ), собираем вечерний
+   опрос по состоянию кожи и через 2–3 недели считаем корреляцию */
+const SKIN_DAIRY_WORDS = ['творог','молок','сыр','йогурт','сливк','сметан','кефир','ряженк','сгущен','казеин','сырок','сыворотк'];
+const SKIN_HIGHGI_WORDS = ['сахар','шоколад','белый хлеб','батон','булк','пирож','торт','печень','вафл','конфет','газировк','кола','фастфуд','чипс','картофель фри','пицца','пельмен'];
+function foodListTriggers(list){
+  let dairy=false, highGi=false;
+  (list||[]).forEach(it=>{
+    const n = normFoodStr(it.name);
+    if(!dairy && SKIN_DAIRY_WORDS.some(w=>n.includes(w))) dairy = true;
+    if(!highGi && SKIN_HIGHGI_WORDS.some(w=>n.includes(w))) highGi = true;
+  });
+  return { dairy, highGi };
+}
+function dayTriggers(ds){ return foodListTriggers(dayItems(ds)); }
+/* «за последние 14 дней N% обострений появлялись через 24 часа после молочки» —
+   считаем правдоподобную корреляцию, а не выдумываем её */
+function skinDairySensitive(){
+  /* lastDays идёт от сегодня назад, поэтому «день перед» — это days[i+1], не days[i-1] */
+  const days = lastDays(21);
+  let flareTotal=0, flareAfterDairy=0;
+  for(let i=0;i<days.length-1;i++){
+    const entry = S.skinLog[days[i]];
+    if(!entry || entry.status!=='flare') continue;
+    flareTotal++;
+    const prevTrig = dayTriggers(days[i+1]);
+    const sameTrig = dayTriggers(days[i]);
+    if(prevTrig.dairy || sameTrig.dairy) flareAfterDairy++;
+  }
+  return flareTotal>=3 && (flareAfterDairy/flareTotal) >= 0.6;
+}
+function skinInsight(){
+  const days = lastDays(21);
+  let flareTotal=0, flareAfterDairy=0, flareAfterGi=0;
+  for(let i=0;i<days.length-1;i++){
+    const entry = S.skinLog[days[i]];
+    if(!entry || entry.status!=='flare') continue;
+    flareTotal++;
+    const prevTrig = dayTriggers(days[i+1]);
+    const sameTrig = dayTriggers(days[i]);
+    if(prevTrig.dairy || sameTrig.dairy) flareAfterDairy++;
+    if(prevTrig.highGi || sameTrig.highGi) flareAfterGi++;
+  }
+  if(flareTotal<3) return null;
+  const pctDairy = Math.round(flareAfterDairy/flareTotal*100);
+  const pctGi = Math.round(flareAfterGi/flareTotal*100);
+  if(pctDairy>=60) return `${S.profile.name}, за последние ${days.length} дней ${pctDairy}% твоих новых воспалений появлялись рядом с молочным белком в трекере. Похоже, кожа реагирует на казеин — попробуй временно исключить творог, сыр и молоко`;
+  if(pctGi>=60) return `${S.profile.name}, за последние ${days.length} дней ${pctGi}% новых воспалений совпадали с быстрыми углеводами высокого ГИ. Попробуй заменить сладкое и белую выпечку на медленные углеводы`;
+  return null;
+}
+function skinPurityPct(){
+  const days = lastDays(14);
+  const logged = days.filter(d=>S.skinLog[d]);
+  if(!logged.length) return null;
+  const calm = logged.filter(d=>S.skinLog[d].status==='calm').length;
+  return Math.round(calm/logged.length*100);
+}
+function skinStatusLabel(st){
+  return st==='flare' ? 'Риск обострения' : (st==='dry' ? 'Сухость' : (st ? 'Стабильно' : 'Нет данных'));
+}
+ACTIONS.openSkin = ()=> openSheet(skinHtml());
+function skinHtml(){
+  const ds = todayStr();
+  const today = S.skinLog[ds];
+  const purity = skinPurityPct();
+  const trig = dayTriggers(ds);
+  const insight = skinInsight();
+  const retToday = !!S.retinoidLog[ds];
+  const ydKey = todayStr(new Date(Date.now()-86400000));
+  const retYesterday = !!S.retinoidLog[ydKey];
+  const purityR = 46, purityCirc = 2*Math.PI*purityR;
+  return `
+    <div class="sheet-title">Здоровье кожи</div>
+
+    <div class="metric-card rise">
+      <div class="metric-lbl">Сегодня:</div>
+      <div class="metric-big"><span class="val" style="color:${today && today.status==='flare' ? 'var(--red)' : (today && today.status==='dry' ? 'var(--accent)' : 'var(--green)')}">${skinStatusLabel(today && today.status)}</span></div>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:10px">
+        <svg width="100" height="100" viewBox="0 0 100 100" style="flex:none">
+          <circle cx="50" cy="50" r="${purityR}" fill="none" stroke="var(--card-2)" stroke-width="8"/>
+          <circle cx="50" cy="50" r="${purityR}" fill="none" stroke="var(--green)" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="${purityCirc*((purity||0)/100)} ${purityCirc}" transform="rotate(-90 50 50)"/>
+          <text x="50" y="55" text-anchor="middle" font-size="20" font-weight="700" fill="var(--text)">${purity!=null?purity+'%':'—'}</text>
+        </svg>
+        <div class="metric-note" style="margin:0">Чистота за 14 дней: доля дней без обострений среди отмеченных</div>
+      </div>
+    </div>
+
+    <div class="metric-card rise" style="animation-delay:.06s">
+      <div class="metric-lbl">Оцени кожу сегодня вечером:</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="data-btn ${today && today.status==='calm'?'active':''}" data-act="setSkinStatus" data-arg="calm" style="flex:1">🙂 Спокойно</button>
+        <button class="data-btn ${today && today.status==='flare'?'active':''}" data-act="setSkinStatus" data-arg="flare" style="flex:1">😖 Воспаления</button>
+        <button class="data-btn ${today && today.status==='dry'?'active':''}" data-act="setSkinStatus" data-arg="dry" style="flex:1">🍂 Сухость</button>
+      </div>
+      ${(trig.dairy || trig.highGi) ? `<div class="metric-note" style="margin-top:10px">Сегодня в трекере еды: ${trig.dairy?'молочный белок ':''}${trig.highGi?'быстрые углеводы (высокий ГИ)':''}</div>` : ''}
+    </div>
+
+    ${insight ? `<div class="advice-card rise" style="animation-delay:.1s"><div class="advice-head"><span class="advice-dot"></span>Инсайт</div><div class="advice-text">${escapeHtml(insight)}</div></div>` : ''}
+
+    <div class="metric-card rise" style="animation-delay:.14s">
+      <div class="metric-lbl">Уход с ретиноидами:</div>
+      <button class="data-btn ${retToday?'active':''}" data-act="toggleRetinoid" style="margin-top:10px;width:100%">${retToday?'✓ Сегодня нанесён ретиноид':'Отметить нанесение ретиноида сегодня'}</button>
+      ${retToday ? `<div class="metric-note" style="margin-top:8px">Вечером — восстанавливающий крем с церамидами. Завтра утром обязателен SPF 50+, кожа фоточувствительна</div>` : ''}
+      ${(!retToday && retYesterday) ? `<div class="metric-note" style="margin-top:8px;color:var(--accent)">Вчера был ретиноид — сегодня утром обязателен SPF 50+</div>` : ''}
+    </div>`;
+}
+ACTIONS.setSkinStatus = (arg)=>{
+  const ds = todayStr();
+  const cur = S.skinLog[ds];
+  S.skinLog[ds] = { status: (cur && cur.status===arg) ? null : arg };
+  if(!S.skinLog[ds].status) delete S.skinLog[ds];
+  save(true); haptic('ok');
+  openSheet(skinHtml());
+};
+ACTIONS.toggleRetinoid = ()=>{
+  const ds = todayStr();
+  S.retinoidLog[ds] = !S.retinoidLog[ds];
+  if(!S.retinoidLog[ds]) delete S.retinoidLog[ds];
+  save(true); haptic('ok');
+  openSheet(skinHtml());
+};
 
 /* ================= Активность ================= */
 function renderActivityTab(){
@@ -3426,8 +3681,11 @@ function editDistanceWithin(a, b, limit){
 /* Как говорят люди → как называется в базе. Синоним РАСШИРЯЕТ запрос, не заменяет его */
 const FOOD_SYN = {
   'картошка':['картофель'],'картоха':['картофель'],'картофан':['картофель'],'фри':['картофель'],
+  /* «паста» одно намеренно НЕ раскрывается в «макарон»: слово само по себе многозначное
+     (макароны / шоколадная паста / томатная паста), и раньше это ломало запрос
+     «шоколадная паста» — движок подмешивал варёные макароны из-за общего слова «паста» */
   'макарошки':['макарон'],'спагетти':['макарон','паста'],'вермишель':['макарон'],
-  'паста':['макарон'],'рожки':['макарон'],'лапша':['макарон'],
+  'рожки':['макарон'],'лапша':['макарон'],
   'яйца':['яйцо'],'яичко':['яйцо'],'белки':['белок'],'творожок':['творог'],
   'кура':['курица','курин'],'курочка':['курица','курин'],'курятина':['курица','курин'],
   'грудка':['грудка','филе'],'филешка':['филе'],'говяшка':['говядина'],
@@ -3750,9 +4008,16 @@ async function startScanner(){
     await loadQuagga();
     Quagga.init({
       inputStream:{ name:'Live', type:'LiveStream', target:scanBox,
-        constraints:{ facingMode:'environment' } },
+        /* пониженное разрешение захвата — распознаванию штрихкода не нужен полный
+           кадр камеры, а меньше пикселей = заметно быстрее декодирование на слабых устройствах */
+        constraints:{ facingMode:'environment', width:{ideal:640}, height:{ideal:480} },
+        area:{ top:'20%', right:'10%', left:'10%', bottom:'20%' } },
       decoder:{ readers:['ean_reader','ean_8_reader','upc_reader','code_128_reader'] },
-      locate:true
+      locate:true,
+      numOfWorkers: (navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency-1) : 2) || 1,
+      frequency: 10,
+      /* halfSample вдвое уменьшает кадр перед анализом — основной выигрыш в скорости */
+      locator:{ patchSize:'medium', halfSample:true }
     }, (err)=>{
       if(err){ if(status) status.textContent = 'Камера недоступна — введи код вручную'; return; }
       scannerActive = true;
