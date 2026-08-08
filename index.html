@@ -2119,19 +2119,6 @@ function reverseInProgress(p){
   if(S.phase!=='maintain' || !S.reverse) return false;
   return goalCalories(p) < maintainTargetKcal(p);
 }
-ACTIONS.setPhase = (arg)=>{
-  const p = S.profile; if(!p) return;
-  if(arg===S.phase){ return; }
-  if(arg==='maintain'){
-    /* фиксируем стартовую точку реверсивного протокола, пока ещё считаем как на сушке */
-    S.reverse = { startDs: todayStr(), fromKcal: goalCalories(p), fromCarbs: macroTargets(p).carbs };
-    S.phase = 'maintain';
-  } else {
-    S.phase = 'cut';
-    S.reverse = null;
-  }
-  save(true); haptic('ok'); renderTab();
-};
 
 function dayItems(ds){ return S.foodLog[ds] || []; }
 function dayTotal(ds){ return Math.round(dayItems(ds).reduce((s,i)=>s+(i.kcal||0),0)); }
@@ -2233,6 +2220,19 @@ function showToast(msg){
 
 /* делегирование кликов */
 const ACTIONS = {};
+ACTIONS.setPhase = (arg)=>{
+  const p = S.profile; if(!p) return;
+  if(arg===S.phase){ return; }
+  if(arg==='maintain'){
+    /* фиксируем стартовую точку реверсивного протокола, пока ещё считаем как на сушке */
+    S.reverse = { startDs: todayStr(), fromKcal: goalCalories(p), fromCarbs: macroTargets(p).carbs };
+    S.phase = 'maintain';
+  } else {
+    S.phase = 'cut';
+    S.reverse = null;
+  }
+  save(true); haptic('ok'); renderTab();
+};
 ACTIONS.joinChannel = gateJoinChannel;
 ACTIONS.recheckAccess = gateRecheckAccess;
 document.addEventListener('click', (e)=>{
@@ -4540,7 +4540,7 @@ ACTIONS.resetAll = ()=>{
     <button class="btn-secondary" style="margin-top:8px" data-act="closeModal">Отмена</button>`);
 };
 ACTIONS.confirmReset = async ()=>{
-  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'' };
+  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'', phase:'cut', reverse:null, skinLog:{}, retinoidLog:{} };
   _snap = null;
   try{ localStorage.removeItem(LS_KEY); localStorage.removeItem('charge_v2'); }catch(e){}
   if(cloudOK){
