@@ -499,9 +499,9 @@ html.lg .sheet-overlay{ backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(
 html.no-scroll, html.no-scroll body{ overflow:hidden; height:100%; }
 .modal-overlay{ position:fixed; inset:0; background:rgba(8,8,12,.55); z-index:120; display:flex; align-items:center; justify-content:center; padding:28px; opacity:0; pointer-events:none; transition:opacity .25s ease; }
 .modal-overlay.open{ opacity:1; pointer-events:auto; }
-.modal{ background:var(--card); border-radius:22px; padding:22px; max-width:340px; width:100%; transform:scale(.9); transition:transform .45s var(--spring); box-shadow:var(--shadow-lg); }
+.modal{ background:var(--card); border-radius:22px; padding:22px; max-width:340px; width:100%; transform:scale(.9); opacity:0; transition:transform .45s var(--spring), opacity .22s ease; box-shadow:var(--shadow-lg); }
 html.lg .modal{ background:var(--glass-bg); backdrop-filter:blur(30px) saturate(180%); -webkit-backdrop-filter:blur(30px) saturate(180%); border:1px solid var(--glass-border); }
-.modal-overlay.open .modal{ transform:scale(1); }
+.modal-overlay.open .modal{ transform:scale(1); opacity:1; }
 .modal-title{ font-size:16.5px; font-weight:800; margin-bottom:10px; }
 .modal-text{ font-size:14px; line-height:1.55; color:var(--text); }
 .modal-text + .modal-text{ margin-top:10px; }
@@ -852,6 +852,7 @@ function mergeStates(a, b){
   Object.keys(a.tomb||{}).concat(Object.keys(b.tomb||{})).forEach(k=>{ out.tomb[k] = Math.max((a.tomb||{})[k]||0, (b.tomb||{})[k]||0); });
   out.foodLog = mergeItemLogs(a.foodLog, b.foodLog, out.tomb);
   out.workoutLog = mergeItemLogs(a.workoutLog, b.workoutLog, out.tomb);
+  out.skinLog = mergeItemLogs(a.skinLog, b.skinLog, out.tomb);
   out.waterLog = mergeNumLog(a.waterLog, b.waterLog, sa, sb, 'water:');
   out.stepsLog = mergeNumLog(a.stepsLog, b.stepsLog, sa, sb, 'steps:');
   out.weightLog = mergeWeights(a.weightLog, b.weightLog, sa, sb);
@@ -865,7 +866,7 @@ function mergeStates(a, b){
 function contentSig(st){
   if(!st) return '';
   try{
-    return JSON.stringify([st.profile, st.theme, st.goalShown, st.foodLog, st.waterLog, st.stepsLog, st.workoutLog, st.weightLog, st.customFoods, st.tomb]);
+    return JSON.stringify([st.profile, st.theme, st.goalShown, st.foodLog, st.waterLog, st.stepsLog, st.workoutLog, st.skinLog, st.weightLog, st.customFoods, st.tomb]);
   }catch(e){ return String(Math.random()); }
 }
 
@@ -965,6 +966,7 @@ function snapshot(st){
     weightLog: JSON.stringify(st.weightLog||[]),
     foodLog: JSON.stringify(st.foodLog||{}),
     workoutLog: JSON.stringify(st.workoutLog||{}),
+    skinLog: JSON.stringify(st.skinLog||{}),
     customFoods: JSON.stringify(st.customFoods||[])
   };
 }
@@ -1021,6 +1023,7 @@ function autoStamp(){
   }
   if(!prev || prev.foodLog!==cur.foodLog) stampItemLog('foodLog', prev? JSON.parse(prev.foodLog) : {}, t);
   if(!prev || prev.workoutLog!==cur.workoutLog) stampItemLog('workoutLog', prev? JSON.parse(prev.workoutLog) : {}, t);
+  if(!prev || prev.skinLog!==cur.skinLog) stampItemLog('skinLog', prev? JSON.parse(prev.skinLog) : {}, t);
   /* чистим старые «надгробия» — они нужны только пока их могут не увидеть другие устройства */
   const cutTs = t - 120*86400000;
   Object.keys(S.tomb).forEach(id=>{ if((S.tomb[id]||0) < cutTs) delete S.tomb[id]; });
@@ -1031,7 +1034,7 @@ function save(now){ clearTimeout(_saveTimer); _saveTimer = setTimeout(doSave, no
 function pruneHistory(){
   /* если данные разрослись — держим последние 180 дней и 250 частых продуктов */
   const cut = todayStr(new Date(Date.now()-180*86400000));
-  [S.foodLog, S.waterLog, S.stepsLog, S.workoutLog].forEach(log=>{ if(log) Object.keys(log).forEach(d=>{ if(d<cut) delete log[d]; }); });
+  [S.foodLog, S.waterLog, S.stepsLog, S.workoutLog, S.skinLog].forEach(log=>{ if(log) Object.keys(log).forEach(d=>{ if(d<cut) delete log[d]; }); });
   if(Array.isArray(S.weightLog) && S.weightLog.length){
     /* чистим и историю веса, но последнюю запись всегда сохраняем (нужна для цели и аналитики) */
     const sorted = [...S.weightLog].sort((a,b)=> String(a.date).localeCompare(String(b.date)));
@@ -1172,6 +1175,7 @@ let S = {
   waterLog:{},         // {'YYYY-MM-DD': ml}
   stepsLog:{},         // {'YYYY-MM-DD': steps}
   workoutLog:{},       // {'YYYY-MM-DD':[{kind,label,mins,detail,kcal,time}]}
+  skinLog:{},          // {'YYYY-MM-DD':[{severity,zone,note,time}]} — трекер воспалений кожи
   theme:{dark:null,accent:'orange'},
   goalShown:false,
   stamps:{},           // метки времени правок — нужны для слияния между устройствами
@@ -2064,6 +2068,22 @@ function activityRating(ds){
 function dayDeficit(ds){ /* истинный дефицит: съедено − расход. Активность уже заложена в коэффициент TDEE, поэтому dayBurned повторно не вычитаем. Отрицательное = дефицит */ return dayTotal(ds) - Math.round(tdee(S.profile)); }
 function dayGoalDelta(ds){ /* отклонение от дневной цели: 0 = точно по плану. Активность уже учтена в норме через TDEE */ return dayTotal(ds) - goalCalories(S.profile); }
 
+/* ---- Здоровье кожи: индекс чистоты и воспаления ---- */
+const SKIN_SEVERITY = { light:{n:'Лёгкое', e:'🙂', pen:6}, medium:{n:'Среднее', e:'😐', pen:13}, strong:{n:'Сильное', e:'😣', pen:24} };
+const SKIN_ZONES = ['Лоб','Т-зона','Щёки','Подбородок','Нос','Другое'];
+function dayInflammations(ds){ return S.skinLog[ds] || []; }
+function skinPurity(ds){
+  const items = dayInflammations(ds);
+  if(!items.length) return 100;
+  const penalty = items.reduce((s,i)=> s + ((SKIN_SEVERITY[i.severity]||{}).pen || 10), 0);
+  return Math.max(0, 100 - penalty);
+}
+function skinRating(score){
+  if(score>=80) return {label:'Отличная', color:'#7be08a'};
+  if(score>=50) return {label:'Средняя', color:'#ffc247'};
+  return {label:'Требует внимания', color:'#ff8a80'};
+}
+
 /* ---- стрик с заморозками (3 в месяц) ---- */
 function streakInfo(){
   const frozen = new Set();
@@ -2097,7 +2117,7 @@ const app = document.getElementById('app');
 /* приводим состояние к рабочему виду: битая/частичная копия (старый бэкап,
    неполное облако) больше не роняет рендер на первом же обращении к полю */
 function normalizeState(){
-  ['foodLog','waterLog','stepsLog','workoutLog','foodFreq','stamps','tomb'].forEach(k=>{
+  ['foodLog','waterLog','stepsLog','workoutLog','skinLog','foodFreq','stamps','tomb'].forEach(k=>{
     if(!S[k] || typeof S[k]!=='object' || Array.isArray(S[k])) S[k] = {};
   });
   ['weightLog','customFoods'].forEach(k=>{ if(!Array.isArray(S[k])) S[k] = []; });
@@ -2883,7 +2903,7 @@ function updateWaterCard(){
   });
 }
 ACTIONS.openEdema = ()=> openSheet(edemaHtml());
-ACTIONS.openSkin = ()=> openSheet(`<div class="sheet-title">Здоровье кожи</div><div class="metric-note">Раздел скоро появится</div>`);
+ACTIONS.openSkin = ()=> openSheet(skinHtml());
 ACTIONS.toggleGlass = (arg)=>{
   const ds = todayStr();
   const i = parseInt(arg)||0;
@@ -2908,6 +2928,99 @@ ACTIONS.infoWater = ()=> openModal(`
   <div class="modal-text">Пей воду по мере жажды и не злоупотребляй ей за час до сна</div>
   <div class="modal-text">Не рекомендую пить больше или меньше назначенной нормы — это может привести к отёкам</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
+
+/* ================= Здоровье кожи ================= */
+function skinTrendHtml(){
+  const ds = todayStr();
+  const days7 = lastDays(7).reverse();
+  return days7.map(d=>{
+    const has = dayInflammations(d).length>0;
+    const p = skinPurity(d);
+    let cls = 'ok';
+    if(has){ cls = p<50 ? 'bad' : (p<80 ? 'warn' : 'ok'); } else { cls = ''; }
+    return `<div class="cal-cell ${cls}${d===ds?' today':''}" data-act="openSkinDay" data-arg="${d}">${parseInt(d.slice(8),10)}</div>`;
+  }).join('');
+}
+function inflammationItemHtml(it,i){
+  const sev = SKIN_SEVERITY[it.severity] || SKIN_SEVERITY.light;
+  return `<div class="workout-item rise">
+    <div class="workout-icon">${sev.e}</div>
+    <div class="workout-info"><div class="workout-name">${escapeHtml(it.zone||'Без зоны')}</div><div class="workout-detail">${sev.n}${it.note?' · '+escapeHtml(it.note):''} · ${it.time||''}</div></div>
+    <button class="log-del" data-act="delInflammation" data-arg="${i}">×</button>
+  </div>`;
+}
+function skinHtml(){
+  const ds = todayStr();
+  const purity = skinPurity(ds);
+  const rating = skinRating(purity);
+  const items = dayInflammations(ds);
+  return `
+    <div class="sheet-title">Здоровье кожи</div>
+
+    <div class="metric-card rise">
+      <button class="info-dot" data-act="infoSkin">${ic('info')}</button>
+      <div class="metric-lbl">Индекс чистоты сегодня:</div>
+      <div class="metric-big"><span class="val" style="color:${rating.color}">${purity}</span><span class="limit2"> / 100</span></div>
+      <div class="metric-bar"><i style="width:${purity}%;background:${rating.color};box-shadow:none"></i></div>
+      <div class="metric-note">${rating.label}${items.length? ' · воспалений сегодня: '+items.length : ' · воспалений не отмечено'}</div>
+    </div>
+
+    <div class="metric-card rise" style="animation-delay:.06s">
+      <div class="metric-lbl">Последние 7 дней:</div>
+      <div class="calendar-grid" style="margin-top:12px">${skinTrendHtml()}</div>
+    </div>
+
+    <div class="section-title">Воспаления сегодня</div>
+    ${items.length ? items.map((it,i)=>inflammationItemHtml(it,i)).join('') : '<div class="empty-hint">Пока не отмечено. Если появились высыпания — запиши, чтобы отследить динамику</div>'}
+    <button class="btn-primary" style="margin-top:14px" data-act="formInflammation">Добавить воспаление</button>`;
+}
+ACTIONS.openSkinDay = (arg)=>{ if(arg) showToast(`${fmtDate(arg)}: индекс чистоты ${skinPurity(arg)}`); };
+ACTIONS.infoSkin = ()=> openModal(`
+  <div class="modal-title">Индекс чистоты кожи</div>
+  <div class="modal-text">Индекс начинается со 100 и снижается за каждое отмеченное воспаление: лёгкое −6, среднее −13, сильное −24</div>
+  <div class="modal-text">Отмечай высыпания по мере появления — так будет видна связь с питанием, сном и уходом за кожей</div>
+  <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
+
+const skinDraft = { severity:null, zone:null, note:'' };
+function syncSkinForm(){
+  const btn = document.getElementById('skinSaveBtn');
+  if(btn) btn.disabled = !(skinDraft.severity && skinDraft.zone);
+}
+ACTIONS.formInflammation = ()=>{
+  skinDraft.severity = null; skinDraft.zone = null; skinDraft.note = '';
+  openSheet(`
+    <div class="sheet-title">Воспаление</div>
+    <div class="field-label">Насколько выражено?</div>
+    <div class="eff-grid" id="sevGrid">${Object.entries(SKIN_SEVERITY).map(([k,v])=>`<button class="eff-btn" data-sev="${k}"><span class="eff-emoji">${v.e}</span>${v.n}</button>`).join('')}</div>
+    <div class="field-label" style="margin-top:14px">Где?</div>
+    <div class="pill-row" id="zoneRow">${SKIN_ZONES.map(z=>`<button class="pill" data-zone="${z}">${z}</button>`).join('')}</div>
+    <div class="field-label" style="margin-top:14px">Заметка (необязательно)</div>
+    <input class="plain-input" id="skinNote" type="text" placeholder="Например: после нового крема">
+    <button class="btn-primary" style="margin-top:14px" id="skinSaveBtn" data-act="saveInflammation" disabled>Записать</button>`);
+  document.querySelectorAll('#sevGrid .eff-btn').forEach(b=>{ b.onclick = ()=>{
+    document.querySelectorAll('#sevGrid .eff-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); skinDraft.severity = b.dataset.sev; haptic('light'); syncSkinForm();
+  };});
+  document.querySelectorAll('#zoneRow .pill').forEach(p=>{ p.onclick = ()=>{
+    document.querySelectorAll('#zoneRow .pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active'); skinDraft.zone = p.dataset.zone; haptic('light'); syncSkinForm();
+  };});
+  document.getElementById('skinNote').oninput = (e)=>{ skinDraft.note = e.target.value; };
+};
+ACTIONS.saveInflammation = ()=>{
+  if(!(skinDraft.severity && skinDraft.zone)){ showToast('Заполни выраженность и зону'); return; }
+  const ds = todayStr();
+  (S.skinLog[ds] = S.skinLog[ds]||[]).push({ severity:skinDraft.severity, zone:skinDraft.zone, note:(skinDraft.note||'').trim(), time:nowTime() });
+  save(true); haptic('ok');
+  openSheet(skinHtml());
+  showToast('Записано');
+};
+ACTIONS.delInflammation = (arg)=>{
+  const ds = todayStr();
+  (S.skinLog[ds]||[]).splice(parseInt(arg),1);
+  save(true); haptic('warn');
+  openSheet(skinHtml());
+};
 
 /* ================= Активность ================= */
 function renderActivityTab(){
@@ -4291,7 +4404,7 @@ ACTIONS.applyRestore = ()=>{
   try{
     const data = JSON.parse(document.getElementById('restText').value);
     if(!data || typeof data!=='object' || !data.profile) throw new Error('bad');
-    S = Object.assign({ foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false }, data);
+    S = Object.assign({ foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, skinLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false }, data);
     /* в бэкапе могут быть null/битые поля — раньше это роняло тему и рендер */
     normalizeState();
     S.uid = TG_UID || ''; S.stamps = {}; S.tomb = {};
@@ -4309,7 +4422,7 @@ ACTIONS.resetAll = ()=>{
     <button class="btn-secondary" style="margin-top:8px" data-act="closeModal">Отмена</button>`);
 };
 ACTIONS.confirmReset = async ()=>{
-  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'' };
+  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, skinLog:{}, theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'' };
   _snap = null;
   try{ localStorage.removeItem(LS_KEY); localStorage.removeItem('charge_v2'); }catch(e){}
   if(cloudOK){
