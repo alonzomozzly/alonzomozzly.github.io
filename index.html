@@ -759,6 +759,15 @@ const CS_CHUNK = 3500, CS_MAX = 200;
 const TG_UID = (function(){ try{ return (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? String(tg.initDataUnsafe.user.id) : ''; }catch(e){ return ''; } })();
 const LS_KEY = TG_UID ? ('charge_v2_u' + TG_UID) : 'charge_v2';
 
+/* ================= Админка (видна только владельцу) =================
+   Кнопка появляется в Настройках только если открывший — админ по TG_UID.
+   Ссылка вида t.me/бот/short_name — это Direct Link Mini App (настроен в
+   BotFather через /newapp), она открывает админку как настоящее
+   Telegram-приложение с initData, а не просто веб-страницу в браузере. */
+const ADMIN_ID = '628989680';
+const ADMIN_PANEL_LINK = 'https://t.me/leanmaxxing_bot/admin';
+const isAdmin = TG_UID === ADMIN_ID;
+
 function csGetChunk(keys){ return new Promise(res=>{ try{ tg.CloudStorage.getItems(keys,(e,v)=>res(e?null:v)); }catch(_){ res(null); } }); }
 /* CloudStorage не любит длинные списки ключей — читаем порциями; null = сбой чтения */
 async function csGetItems(keys){
@@ -4300,7 +4309,11 @@ function renderSettingsTab(){
         <button class="data-btn" data-act="exportData"><span class="data-btn-ic">${ic('download')}</span>Экспорт / резервная копия<span class="data-btn-sub">все данные одним файлом</span></button>
         <button class="data-btn" data-act="openRestore"><span class="data-btn-ic">${ic('restore')}</span>Восстановить из копии<span class="data-btn-sub">вставь сохранённый текст копии</span></button>
         <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>Сбросить всё<span class="data-btn-sub">удалить профиль и историю</span></button>
-      </div>`;
+      </div>
+      ${isAdmin ? `
+      <div class="card">
+        <button class="data-btn" data-act="openAdminPanel"><span class="data-btn-ic">${ic('history')}</span>Админка<span class="data-btn-sub">статистика и рассылка</span></button>
+      </div>` : ''}`;
   }
   return `
     <div class="topbar"><div class="topbar-title">Настройки</div></div>
@@ -4517,6 +4530,11 @@ ACTIONS.applyRestore = ()=>{
     showToast('Данные восстановлены');
     ui.tab = 'home'; renderMain();
   }catch(e){ showToast('Не получилось прочитать копию — проверь текст'); }
+};
+ACTIONS.openAdminPanel = ()=>{
+  if(!isAdmin) return; /* подстраховка: даже если кто-то дёрнет action напрямую */
+  if(tg && tg.openTelegramLink) tg.openTelegramLink(ADMIN_PANEL_LINK);
+  else window.open(ADMIN_PANEL_LINK, '_blank');
 };
 ACTIONS.resetAll = ()=>{
   openModal(`
