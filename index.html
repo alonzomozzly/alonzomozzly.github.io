@@ -1903,7 +1903,7 @@ async function offFetchJson(url, ms){
   const ctl = new AbortController();
   const t = setTimeout(()=>ctl.abort(), ms);
   try{
-    const res = await fetch(url, { signal: ctl.signal });
+    const res = await fetch(url, { signal: ctl.signal, cache: 'no-store' });
     if(!res.ok) throw new Error('http '+res.status);
     return await res.json();
   } finally { clearTimeout(t); }
@@ -1913,7 +1913,8 @@ async function offFetchJson(url, ms){
    поэтому спрашиваем все параллельно и берём всё, что успело ответить */
 const OFF_HOSTS = ['https://ru.openfoodfacts.org', 'https://world.openfoodfacts.org'];
 const OFF_FIELDS = 'code,product_name,product_name_ru,product_name_en,generic_name,generic_name_ru,brands,nutriments';
-async function searchOpenFoodFacts(query){
+async function searchOpenFoodFacts(query, opts){
+  opts = opts || {};
   const variants = offQueryVariants(query);
   if(!variants.length) return [];
   const urls = [];
@@ -1939,7 +1940,26 @@ async function searchOpenFoodFacts(query){
       seen.add(key); out.push(f);
     }
   }
-  if(!anyOk) throw new Error('network');
+  if(!anyOk){
+    /* все зеркала не ответили — обычно это временный сбой сети или лимит частоты,
+       а не «в базе действительно ничего нет». Раньше это выглядело как пустой поиск,
+       который необъяснимо чинился сам собой при повторном вводе того же текста —
+       один быстрый повтор здесь и убирает эту нестабильность */
+    if(!opts.netRetried){
+      await new Promise(res=>setTimeout(res, 700));
+      return searchOpenFoodFacts(query, Object.assign({}, opts, { netRetried:true }));
+    }
+    throw new Error('network');
+  }
+  /* по всей фразе целиком ничего («чиабатта рустик») — пробуем главное (самое длинное)
+     слово без уточнений, вместо того чтобы отдавать пустой результат */
+  if(!out.length && !opts.wordFallback){
+    const tokens = foodTokens(query);
+    if(tokens.length>1){
+      const main = tokens.slice().sort((a,b)=>b.length-a.length)[0];
+      if(main) return searchOpenFoodFacts(main, { wordFallback:true });
+    }
+  }
   return out;
 }
 /* Штрихкод может лежать в базе в другой форме: UPC-A без ведущего нуля, EAN-8,
@@ -3647,6 +3667,12 @@ const TRANSLIT_PAIRS = [['shch','щ'],['sch','щ'],['sh','ш'],['ch','ч'],['zh'
   ['s','с'],['t','т'],['u','у'],['f','ф'],['h','х'],['c','к'],['y','ы'],['w','в'],['x','кс'],['q','к']];
 function fromLayout(w){ let o=''; for(const ch of w) o += (LAYOUT_RU[ch] || ch); return o; }
 function fromTranslit(w){ let o = w; for(const pair of TRANSLIT_PAIRS) o = o.split(pair[0]).join(pair[1]); return o; }
+/* обратный транслит: рус → лат. Нужен для онлайн-базы — там половина товаров
+   (Ciabatta, Focaccia, Panini…) названа латиницей, а не по-русски */
+const RU2LAT = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'i',к:'k',л:'l',
+  м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',
+  ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya' };
+function toLatin(w){ let o=''; for(const ch of w) o += (RU2LAT[ch]!=null ? RU2LAT[ch] : ch); return o; }
 function normFoodStr(x){
   return String(x||'').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9%.\s-]/g,' ').replace(/\s+/g,' ').trim();
 }
@@ -3776,7 +3802,13 @@ function offQueryVariants(q){
     const lay = base.split(' ').map(fromLayout).join(' ');
     if(lay!==base && /[а-я]/.test(lay)) out.push(lay);
   }
-  return out.slice(0,2);
+  /* товары в открытой базе часто названы латиницей (Ciabatta, Focaccia, Panini…),
+     а не по-русски — без транслита такие запросы находили ноль результатов */
+  if(/[а-я]/.test(base)){
+    const lat = base.split(' ').map(toLatin).join(' ');
+    if(lat && lat!==base && out.indexOf(lat)<0) out.push(lat);
+  }
+  return out.slice(0,3);
 }
 function doFoodSearch(q){
   const box = document.getElementById('searchResults');
@@ -3813,11 +3845,13 @@ function doFoodSearch(q){
       const st = document.getElementById('offStatus');
       const res = document.getElementById('offResults');
       if(!st || !res) return;
-      /* ранжируем онлайн-результаты тем же движком — OFF отдаёт много мусора */
+      /* ранжируем онлайн-результаты тем же движком — OFF отдаёт много мусора.
+         раньше топ-5 показывались всегда, даже с нулевым баллом совпадения —
+         из-за этого в выдаче попадались продукты, похожие лишь одной буквой */
       const scored = list.filter(f=>!shown.has(normFoodStr(f.name)))
         .map(f=>({f:f, s:foodScore(f, parsed)}))
+        .filter(x=>x.s>0)
         .sort((a,b)=> b.s-a.s)
-        .filter((x,i)=> x.s>0 || i<5)
         .slice(0,12).map(x=>x.f);
       if(!scored.length){
         st.textContent = ranked.length ? 'В открытой базе больше ничего нет' : 'Ничего не нашлось — попробуй короче или добавь своё блюдо';
