@@ -2889,15 +2889,15 @@ function edemaHtml(){
     <div class="metric-card rise">
       <button class="info-dot" data-act="infoSalt">${ic('info')}</button>
       <div class="metric-lbl">Съедено соли:</div>
-      <div class="metric-big ${saltOver?'over':''}"><span class="val">${hasNk?salt+' г':'нет данных'}</span>${hasNk?`<span class="limit2"> / ${SALT_LIMIT}</span>`:''}</div>
+      <div class="metric-big ${saltOver?'over':''}"><span class="val">${hasNk?salt+' г':'пока не записано'}</span>${hasNk?`<span class="limit2"> / ${SALT_LIMIT}</span>`:''}</div>
       <div class="metric-bar ${saltOver?'danger':''}"><i style="width:${hasNk?Math.min(salt/SALT_LIMIT*100,100):0}%"></i></div>
       ${saltOver?'<div class="metric-note" style="color:var(--red)">Избыток соли — возможна задержка воды и отёк утром. Выбирай пресную еду до конца дня</div>':''}
-      <div class="nk-grid">
-        <div class="nk-cell"><div class="nk-cell-lbl">Натрий</div><div class="nk-cell-val">${hasNk?na+' мг':'—'}</div></div>
-        <div class="nk-cell"><div class="nk-cell-lbl">Калий</div><div class="nk-cell-val">${hasNk?k+' мг':'—'}</div></div>
+      ${hasNk?`<div class="nk-grid">
+        <div class="nk-cell"><div class="nk-cell-lbl">Натрий</div><div class="nk-cell-val">${na} мг</div></div>
+        <div class="nk-cell"><div class="nk-cell-lbl">Калий</div><div class="nk-cell-val">${k} мг</div></div>
         <div class="nk-cell"><div class="nk-cell-lbl">Баланс</div><div class="nk-cell-val"><span class="nk-ratio-badge ${ratioState}">${ratioLabel}</span></div></div>
       </div>
-      <div class="metric-note" style="margin-top:8px">${ratioNote}</div>
+      <div class="metric-note" style="margin-top:8px">${ratioNote}</div>`:''}
     </div>
 
     <div class="metric-card rise" style="animation-delay:.06s">
@@ -3564,7 +3564,7 @@ function foodResultHtml(f, src){
   </button>`;
 }
 function addFoodHtml(){
-  const tabs = [ {k:'search',l:'Поиск'}, {k:'recent',l:'Недавние'}, {k:'scan',l:'Штрихкод'}, {k:'own',l:'Своё блюдо'} ];
+  const tabs = [ {k:'search',l:'Поиск'}, {k:'recent',l:'Недавние'}, {k:'scan',l:'Штрихкод'}, {k:'own',l:'Свой продукт'} ];
   return `
     <div class="sheet-title">Добавить еду</div>
     <div class="food-tabs">${tabs.map(t=>`<button class="food-tab ${foodTab===t.k?'active':''}" data-act="foodTab" data-arg="${t.k}">${t.l}</button>`).join('')}</div>
@@ -3607,17 +3607,15 @@ function renderFoodTabBody(){
   }
   else if(foodTab==='own'){
     body.innerHTML = `
-      <div class="field-label">Новое блюдо (на 100 г)</div>
+      <div class="field-label">КБЖУ нового продукта (на 100 г)</div>
       <input class="plain-input" id="cfName" type="text" placeholder="Название" value="${escapeHtml(pendingCfName||'')}" style="margin-bottom:8px">
       <div class="import-row2">
-        <input class="plain-input" id="cfKcal" type="text" inputmode="decimal" placeholder="ккал на 100 г">
-        <input class="plain-input" id="cfP" type="text" inputmode="decimal" placeholder="Б, г — можно 3.6">
-        <input class="plain-input" id="cfC" type="text" inputmode="decimal" placeholder="У, г">
-        <input class="plain-input" id="cfF" type="text" inputmode="decimal" placeholder="Ж, г">
-      </div>
-      <div class="import-row2" style="margin-top:8px">
-        <input class="plain-input" id="cfNa" type="text" inputmode="decimal" placeholder="Натрий, мг — необяз.">
-        <input class="plain-input" id="cfK" type="text" inputmode="decimal" placeholder="Калий, мг — необяз.">
+        <input class="plain-input" id="cfKcal" type="text" inputmode="decimal" placeholder="ккал">
+        <input class="plain-input" id="cfP" type="text" inputmode="decimal" placeholder="белок, г">
+        <input class="plain-input" id="cfC" type="text" inputmode="decimal" placeholder="углеводы, г">
+        <input class="plain-input" id="cfF" type="text" inputmode="decimal" placeholder="жиры, г">
+        <input class="plain-input" id="cfNa" type="text" inputmode="decimal" placeholder="натрий, мг (если знаешь)">
+        <input class="plain-input" id="cfK" type="text" inputmode="decimal" placeholder="калий, мг (если знаешь)">
       </div>
       <div class="theme-toggle-row" style="padding:12px 2px 2px" data-act="toggleCfPub">
         <div style="font-size:14.5px;font-weight:600">Публичный продукт<div class="settings-hint" style="margin:2px 0 0">Появится в поиске у всех пользователей</div></div>
@@ -3865,7 +3863,7 @@ ACTIONS.saveCustomFood = ()=>{
       showToast('Общая база не подключена — продукт сохранён локально');
     }
   } else {
-    showToast('Сохранено в «Своё блюдо»');
+    showToast('Сохранено в «Свой продукт»');
   }
   renderFoodTabBody();
 };
@@ -4258,8 +4256,8 @@ function renderSettingsTab(){
             <button class="pill ${p.gender==='female'?'active':''}" data-act="setGender" data-arg="female">Девушка</button>
           </div></div>
         <div class="field-row"><div class="field-row-lbl">Возраст</div><input class="field-row-input" id="sAge" type="number" inputmode="numeric" value="${p.age}"></div>
-        <div class="field-row"><div class="field-row-lbl">Рост, см</div><input class="field-row-input" id="sHeight" type="number" inputmode="numeric" value="${p.height}"></div>
-        <div class="field-row"><div class="field-row-lbl">Вес, кг</div><input class="field-row-input" id="sWeight" type="number" inputmode="decimal" value="${p.weight}"></div>
+        <div class="field-row"><div class="field-row-lbl">Рост</div><input class="field-row-input" id="sHeight" type="number" inputmode="numeric" value="${p.height}"></div>
+        <div class="field-row"><div class="field-row-lbl">Вес</div><input class="field-row-input" id="sWeight" type="number" inputmode="decimal" value="${p.weight}"></div>
       </div>
       <div class="card" style="margin-top:14px">
         <button class="info-dot" data-act="infoActivity">${ic('info')}</button>
@@ -4267,8 +4265,7 @@ function renderSettingsTab(){
         <div class="pill-row" style="margin-top:10px">
           ${[['min','Минимальный'],['low','Слабый'],['medium','Умеренный'],['high','Высокий']].map(([k,l])=>`<button class="pill ${p.activity===k?'active':''}" data-act="setActivity" data-arg="${k}">${l}</button>`).join('')}
         </div>
-      </div>
-      <div class="settings-hint">Дневная норма калорий автоматически пересчитывается при любом изменении</div>`;
+      </div>`;
   }
   else if(ui.settingsTab==='goal'){
     const rk = x=>Math.round(tdee(p)*x/10)*10;
@@ -4285,14 +4282,13 @@ function renderSettingsTab(){
       <div class="card" style="margin-top:14px">
         <div class="field-row"><div class="field-row-lbl">Целевой вес, кг</div><input class="field-row-input" id="sTarget" type="number" inputmode="decimal" value="${p.targetWeight}"></div>
       </div>
-      <div class="settings-hint">${man?'Норма зафиксирована вручную — формула её не перезапишет. Цель выше влияет только на прогноз темпа':'Дневная норма калорий автоматически пересчитывается при любом изменении'}</div>`;
+      ${man?'<div class="settings-hint">Норма зафиксирована вручную — формула её не перезапишет. Цель выше влияет только на прогноз темпа</div>':''}`;
   }
   else if(ui.settingsTab==='look'){
     body = `
       <div class="card">
         <div class="theme-toggle-row" data-act="toggleDark"><div>Тёмная тема</div><div class="switch ${isDark()?'on':''}"><div class="knob"></div></div></div>
-        <div class="settings-hint" style="margin:6px 2px 14px">По умолчанию тема берётся из Telegram</div>
-        <div class="field-label">Акцентный цвет</div>
+        <div class="field-label">Цвет темы</div>
         <div class="accent-dots">
           <div class="accent-choice ${!['red','green','blue','mono'].includes(S.theme.accent)?'active':''}" data-act="setAccent" data-arg="orange"><div class="accent-dot a-orange"></div><div class="accent-name">Оригинальный</div></div>
           <div class="accent-choice ${S.theme.accent==='red'?'active':''}" data-act="setAccent" data-arg="red"><div class="accent-dot a-red"></div><div class="accent-name">Красный</div></div>
@@ -4305,14 +4301,14 @@ function renderSettingsTab(){
   else if(ui.settingsTab==='data'){
     body = `
       <div class="card">
-        <button class="data-btn" data-act="openImport"><span class="data-btn-ic">${ic('history')}</span>Импорт истории сушки<span class="data-btn-sub">восстановит стрик, графики и статистику</span></button>
-        <button class="data-btn" data-act="exportData"><span class="data-btn-ic">${ic('download')}</span>Экспорт / резервная копия<span class="data-btn-sub">все данные одним файлом</span></button>
-        <button class="data-btn" data-act="openRestore"><span class="data-btn-ic">${ic('restore')}</span>Восстановить из копии<span class="data-btn-sub">вставь сохранённый текст копии</span></button>
-        <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>Сбросить всё<span class="data-btn-sub">удалить профиль и историю</span></button>
+        <button class="data-btn" data-act="openImport"><span class="data-btn-ic">${ic('history')}</span>Импорт сушки</button>
+        <button class="data-btn" data-act="exportData"><span class="data-btn-ic">${ic('download')}</span>Резервная копия</button>
+        <button class="data-btn" data-act="openRestore"><span class="data-btn-ic">${ic('restore')}</span>Восстановить данные</button>
+        <button class="data-btn danger" data-act="resetAll"><span class="data-btn-ic">${ic('trash')}</span>Удалить профиль</button>
       </div>
       ${isAdmin ? `
       <div class="card">
-        <button class="data-btn" data-act="openAdminPanel"><span class="data-btn-ic">${ic('history')}</span>Админка<span class="data-btn-sub">статистика и рассылка</span></button>
+        <button class="data-btn" data-act="openAdminPanel"><span class="data-btn-ic">${ic('history')}</span>Тайлерджонка</button>
       </div>` : ''}`;
   }
   return `
@@ -4346,9 +4342,9 @@ ACTIONS.setActivity = (arg)=>{ S.profile.activity = arg; save(); renderTab(); };
 ACTIONS.infoActivity = ()=> openModal(`
   <div class="modal-title">Уровни активности</div>
   <div class="modal-text" style="text-align:left">
-    <b>Минимальный</b> — сидячая работа, минимум шагов, тренировок нет (×1.2)<br><br>
-    <b>Слабый</b> — лёгкая активность: прогулки, 1–3 тренировки в неделю (×1.375)<br><br>
-    <b>Умеренный</b> — тренировки 3–5 раз в неделю, много движения днём (×1.55)<br><br>
+    <b>Минимальный</b> — сидячий образ жизни, минимум шагов и отсутствие тренировок (×1.2)<br><br>
+    <b>Слабый</b> — лёгкая активность, прогулки, 1–3 тренировки в неделю (×1.375)<br><br>
+    <b>Умеренный</b> — много движения днём и тренировки 3–5 раз в неделю (×1.55)<br><br>
     <b>Высокий</b> — интенсивные тренировки 6–7 раз в неделю или физическая работа (×1.725)<br><br>
     Коэффициент умножается на базовый обмен по формуле Миффлина-Сан Жеора — так считается твоя дневная норма. Норма пересчитывается сразу после выбора. Выбирай честно: завышенный уровень замедлит сушку</div>
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
