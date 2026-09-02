@@ -919,7 +919,7 @@ function contentSig(st){
 }
 
 /* ---------- чтение облака ---------- */
-let _csGen = 'A', _cloudHadProfile = false, _lastProfileJson = '', _cloudReadOK = false;
+let _csGen = 'A', _cloudHadProfile = false, _lastProfileJson = '', _cloudReadOK = false, _lastMetaStr = '';
 async function readGen(metaVal){
   const [gen, nStr, lenStr] = String(metaVal||'').split(':');
   const n = parseInt(nStr)||0, len = parseInt(lenStr)||0;
@@ -936,6 +936,7 @@ async function cloudRead(){
   try{
     const meta = await csGetItems(['cs2_meta','cs2_meta_prev','cs_meta']);
     if(!meta) return {ok:false, state:null};
+    _lastMetaStr = meta.cs2_meta || _lastMetaStr; /* переиспользуем в doSave — не читаем этот ключ второй раз */
     if(meta.cs2_meta){
       const r = await readGen(meta.cs2_meta);
       if(r.ok) return r;
@@ -1136,25 +1137,34 @@ async function doSave(){
     saveLocal(json);
     _snap = snapshot(S);
     /* 2) пишем в НЕАКТИВНУЮ генерацию и переключаем мету только после успеха всех
-          кусков — прошлая целая копия всегда остаётся как резерв */
+          кусков — прошлая целая копия всегда остаётся как резерв.
+          Куски и обе меты пишутся параллельно (независимые ключи) — это заметно
+          сокращает цепочку сетевых обращений подряд: раньше, если пользователь
+          на телефоне закрывал мини-приложение сразу после добавления продукта,
+          Telegram мог убить страницу быстрее, чем эта цепочка успевала дойти до
+          конца, и запись в облако терялась (хотя на самом телефоне, в localStorage,
+          данные уже лежали — отсюда и «на телефоне осталось, на компе нет») */
     const gen = _csGen==='A' ? 'B' : 'A';
     const n = Math.max(1, Math.ceil(json.length/CS_CHUNK));
     let ok = n<=CS_MAX;
-    for(let i=0; i<n && ok; i++){
-      const chunk = json.slice(i*CS_CHUNK,(i+1)*CS_CHUNK);
-      let res = await csSetItem('cs'+gen+'_'+i, chunk);
-      if(!res) res = await csSetItem('cs'+gen+'_'+i, chunk); /* один повтор */
-      ok = ok && res;
+    if(ok){
+      const writeChunk = (i)=>{
+        const chunk = json.slice(i*CS_CHUNK,(i+1)*CS_CHUNK);
+        return csSetItem('cs'+gen+'_'+i, chunk).then(res=> res || csSetItem('cs'+gen+'_'+i, chunk)); /* один повтор */
+      };
+      const results = await Promise.all(Array.from({length:n}, (_,i)=>writeChunk(i)));
+      ok = results.every(Boolean);
     }
     if(ok){
-      const oldMeta = (await csGetItems(['cs2_meta'])) || {};
-      if(oldMeta.cs2_meta) await csSetItem('cs2_meta_prev', oldMeta.cs2_meta);
-      if(await csSetItem('cs2_meta', gen+':'+n+':'+json.length+':'+S.savedAt)) _csGen = gen;
-    }
-    if(S.profile){
-      const pj = JSON.stringify(S.profile);
-      if(pj !== _lastProfileJson && pj.length < 4000 && await csSetItem('cs_profile', pj)) _lastProfileJson = pj;
-      _cloudHadProfile = true;
+      const newMeta = gen+':'+n+':'+json.length+':'+S.savedAt;
+      const writes = [ csSetItem('cs2_meta', newMeta).then(r=>{ if(r){ _csGen = gen; _lastMetaStr = newMeta; } return r; }) ];
+      if(_lastMetaStr && _lastMetaStr!==newMeta) writes.push(csSetItem('cs2_meta_prev', _lastMetaStr));
+      if(S.profile){
+        const pj = JSON.stringify(S.profile);
+        if(pj !== _lastProfileJson && pj.length < 4000) writes.push(csSetItem('cs_profile', pj).then(r=>{ if(r) _lastProfileJson = pj; }));
+      }
+      await Promise.all(writes);
+      if(S.profile) _cloudHadProfile = true;
     }
   }catch(e){}
   _csSaving = false;
