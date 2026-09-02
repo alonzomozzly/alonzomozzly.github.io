@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Charge — трекер сушки</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <!-- Quagga подгружается лениво только при открытии сканера штрихкодов (loadQuagga), а не на старте (–~300 КБ) -->
@@ -626,6 +629,29 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 (function(){
 "use strict";
 
+/* ================= Версия / автообновление =================
+   Telegram Desktop заметно агрессивнее кэширует мини-приложение, чем мобильные
+   клиенты — из-за этого на компьютере может надолго «застрять» старая версия
+   кода, пока на телефоне уже работает новая (отсюда расхождения в цветах
+   аналитики, стрике и т.п. — это две разные версии кода, а не проблема данных).
+   Метка ниже нужно менять при каждом обновлении файла. */
+const APP_VERSION = '2026-09-03.1';
+/* раз в визит и раз в 5 минут сверяем версию с самим собой (без кэша); если
+   на сервере лежит уже другой файл — значит открыт устаревший кэш, обновляемся */
+async function checkForUpdate(){
+  try{
+    const res = await fetch(location.href, { cache:'no-store' });
+    if(!res.ok) return;
+    const text = await res.text();
+    const m = text.match(/APP_VERSION\s*=\s*'([^']+)'/);
+    if(!m || !m[1] || m[1]===APP_VERSION) return;
+    /* не перезагружаем поверх открытой формы/шторки — там может быть несохранённый ввод */
+    const so = document.getElementById('sheetOverlay'), mo = document.getElementById('modalOverlay');
+    if((so && so.classList.contains('open')) || (mo && mo.classList.contains('open'))) return;
+    location.reload();
+  }catch(e){}
+}
+
 /* ================= Telegram + среда ================= */
 /* реальный Telegram определяем по документрованному WebApp.platform (не по несуществующему initDataUnavailable) */
 const _WA = window.Telegram && window.Telegram.WebApp;
@@ -1220,12 +1246,13 @@ async function syncFromCloud(){
   }catch(e){}
   _syncBusy = false;
 }
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') syncFromCloud(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ syncFromCloud(); checkForUpdate(); } });
 window.addEventListener('focus', ()=>syncFromCloud());
 window.addEventListener('online', ()=>syncFromCloud());
 /* 7 секунд было слишком агрессивно: каждый тик — чтение десятков ключей
    CloudStorage, и Telegram начинал резать запросы по рейт-лимиту */
 setInterval(()=>{ if(document.visibilityState==='visible') syncFromCloud(); }, 20000);
+setInterval(checkForUpdate, 300000);
 
 /* ================= Состояние ================= */
 let S = {
@@ -2343,6 +2370,7 @@ function seedDemo(){
 
 /* ================= Init ================= */
 async function init(){
+  checkForUpdate();
   const params = new URLSearchParams(location.search);
   await resolveIdentity(); /* дождаться настоящих TG_UID/CloudStorage перед первым чтением — см. комментарий выше */
   isAdmin = TG_UID === ADMIN_ID; /* пересчитать: выше могло смениться значение TG_UID */
