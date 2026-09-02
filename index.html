@@ -1353,7 +1353,7 @@ function autoTagFood(name){
 }
 const FOOD_DB = [
   /* закреплённая добавка: 1 порция = 1 г порошка ≈ 365 мг чистого калия, 0 ккал */
-  {name:'Калий цитрат (1 г)', emoji:'💊', pinned:true, fixed:{kcal:0,p:0,c:0,f:0,na:0,k:365}},
+  {name:'Калий цитрат', emoji:'💊', pinned:true, unitLabel:'одна капсула', fixed:{kcal:0,p:0,c:0,f:0,na:0,k:365}},
   {name:'Куриная грудка (варёная)', emoji:'🍗', per100:{kcal:165,p:31,c:0,f:3.6,na:64,k:350}},
   {name:'Рис отварной', emoji:'🍚', per100:{kcal:130,p:2.7,c:28,f:0.3,na:5,k:35}},
   {name:'Гречка отварная', emoji:'🍛', per100:{kcal:110,p:4,c:21,f:1.1,na:4,k:150}},
@@ -1663,7 +1663,6 @@ const FOOD_DB = [
   {name:'Протеин сывороточный (порошок)', emoji:'🥤', per100:{kcal:380,p:75,c:8,f:5,na:200,k:500}},  /* ---- мясо, рыба, яйца ---- */
   {name:'Куриная грудка сырая (филе)', emoji:'🍗', per100:{kcal:113,p:23.6,c:0.4,f:1.9,na:60,k:292}},
   {name:'Куриная грудка гриль', emoji:'🍗', per100:{kcal:158,p:29,c:0,f:4,na:290,k:330}},
-  {name:'Куриное бедро без кожи', emoji:'🍗', per100:{kcal:185,p:21,c:0,f:11,na:85,k:230}},
   {name:'Куриное крыло', emoji:'🍗', per100:{kcal:186,p:19,c:0,f:12,na:82,k:190}},
   {name:'Куриный фарш', emoji:'🍖', per100:{kcal:143,p:20,c:0,f:7,na:70,k:250}},
   {name:'Индейка (филе грудки)', emoji:'🦃', per100:{kcal:104,p:24,c:0,f:1,na:55,k:300}},
@@ -1676,20 +1675,13 @@ const FOOD_DB = [
   {name:'Баранина', emoji:'🥩', per100:{kcal:209,p:16,c:0,f:16,na:65,k:270}},
   {name:'Кролик', emoji:'🥩', per100:{kcal:156,p:21,c:0,f:8,na:57,k:335}},
   {name:'Печень куриная', emoji:'🫀', per100:{kcal:137,p:20,c:0.7,f:6,na:90,k:290}},
-  {name:'Печень говяжья', emoji:'🫀', per100:{kcal:127,p:20,c:4,f:3.6,na:104,k:277}},
   {name:'Сердце куриное', emoji:'🫀', per100:{kcal:158,p:16,c:1,f:10,na:75,k:176}},
   {name:'Лосось (семга)', emoji:'🐟', per100:{kcal:208,p:20,c:0,f:13,na:59,k:363}},
   {name:'Лосось слабосолёный', emoji:'🐟', per100:{kcal:202,p:22,c:0,f:12,na:1200,k:340}},
-  {name:'Горбуша', emoji:'🐟', per100:{kcal:142,p:21,c:0,f:6,na:70,k:335}},
-  {name:'Форель', emoji:'🐟', per100:{kcal:141,p:20,c:0,f:6,na:52,k:361}},
   {name:'Треска', emoji:'🐟', per100:{kcal:82,p:18,c:0,f:0.7,na:78,k:413}},
   {name:'Минтай', emoji:'🐟', per100:{kcal:72,p:16,c:0,f:0.9,na:100,k:420}},
-  {name:'Сельдь солёная', emoji:'🐟', per100:{kcal:217,p:19,c:0,f:15,na:1500,k:180}},
-  {name:'Тунец в собственном соку', emoji:'🐟', per100:{kcal:96,p:22,c:0,f:0.6,na:320,k:230}},
-  {name:'Креветки варёные', emoji:'🍤', per100:{kcal:99,p:24,c:0.2,f:0.3,na:590,k:260}},
   {name:'Кальмар', emoji:'🦑', per100:{kcal:92,p:16,c:3,f:1.4,na:44,k:246}},
   {name:'Мидии', emoji:'🦪', per100:{kcal:86,p:12,c:3.7,f:2,na:286,k:320}},
-  {name:'Икра красная', emoji:'🍚', per100:{kcal:249,p:24,c:4,f:15,na:1500,k:180}},
   {name:'Яйцо (1 шт, среднее)', emoji:'🥚', fixed:{kcal:70,p:6.3,c:0.4,f:5,na:62,k:63}},
   {name:'Яичный белок (1 шт)', emoji:'🥚', fixed:{kcal:17,p:3.6,c:0.2,f:0.1,na:55,k:54}},
   {name:'Яичница из 2 яиц', emoji:'🍳', fixed:{kcal:180,p:13,c:1,f:14,na:150,k:140}},
@@ -1707,12 +1699,7 @@ const FOOD_DB = [
   /* ---- крупы, гарниры, мука ---- */
   {name:'Гречка сухая (крупа)', emoji:'🍛', per100:{kcal:343,p:13,c:62,f:3.4,na:11,k:460}},
   {name:'Рис белый сухой', emoji:'🍚', per100:{kcal:344,p:6.7,c:78,f:0.7,na:5,k:100}},
-  {name:'Рис бурый отварной', emoji:'🍚', per100:{kcal:123,p:2.7,c:25,f:1,na:4,k:86}},
-  {name:'Булгур отварной', emoji:'🍚', per100:{kcal:83,p:3,c:19,f:0.2,na:5,k:68}},
-  {name:'Киноа отварная', emoji:'🍚', per100:{kcal:120,p:4.4,c:21,f:1.9,na:7,k:172}},
-  {name:'Перловка отварная', emoji:'🍛', per100:{kcal:109,p:3.1,c:23,f:0.4,na:3,k:78}},
   {name:'Пшёнка отварная', emoji:'🍛', per100:{kcal:90,p:3,c:17,f:0.8,na:5,k:100}},
-  {name:'Кукурузная каша', emoji:'🍛', per100:{kcal:86,p:2,c:18,f:0.6,na:5,k:60}},
   {name:'Манная каша на молоке', emoji:'🥣', per100:{kcal:98,p:3,c:15,f:2.5,na:50,k:110}},
   {name:'Овсяная каша на молоке', emoji:'🥣', per100:{kcal:105,p:3.9,c:14,f:3.5,na:45,k:130}},
   {name:'Кускус сухой', emoji:'🍚', per100:{kcal:376,p:13,c:72,f:0.6,na:10,k:166}},
@@ -1722,16 +1709,10 @@ const FOOD_DB = [
   {name:'Лаваш', emoji:'🫓', per100:{kcal:275,p:9,c:56,f:1.2,na:490,k:120}},
   {name:'Тортилья пшеничная', emoji:'🫓', per100:{kcal:310,p:8,c:51,f:8,na:600,k:130}},
   {name:'Хлеб белый (батон)', emoji:'🍞', per100:{kcal:262,p:8,c:50,f:3,na:490,k:120}},
-  {name:'Хлеб цельнозерновой', emoji:'🍞', per100:{kcal:230,p:10,c:39,f:3.5,na:420,k:250}},
   {name:'Хлебцы ржаные', emoji:'🧇', per100:{kcal:310,p:11,c:58,f:3,na:400,k:400}},
   {name:'Мука пшеничная', emoji:'🌾', per100:{kcal:342,p:10,c:70,f:1.1,na:2,k:122}},
   {name:'Овсяная мука', emoji:'🌾', per100:{kcal:369,p:13,c:65,f:7,na:5,k:350}},
   /* ---- молочное ---- */
-  {name:'Молоко 2.5%', emoji:'🥛', per100:{kcal:52,p:2.9,c:4.7,f:2.5,na:50,k:146}},
-  {name:'Молоко 3.2%', emoji:'🥛', per100:{kcal:59,p:2.9,c:4.7,f:3.2,na:50,k:146}},
-  {name:'Кефир 1%', emoji:'🥛', per100:{kcal:40,p:3,c:4,f:1,na:50,k:146}},
-  {name:'Ряженка 2.5%', emoji:'🥛', per100:{kcal:54,p:2.9,c:4.2,f:2.5,na:50,k:146}},
-  {name:'Сметана 15%', emoji:'🥛', per100:{kcal:162,p:2.6,c:3.6,f:15,na:35,k:120}},
   {name:'Сливки 10%', emoji:'🥛', per100:{kcal:118,p:2.8,c:4,f:10,na:35,k:120}},
   {name:'Творог обезжиренный', emoji:'🧀', per100:{kcal:71,p:16,c:1.3,f:0.6,na:41,k:117}},
   {name:'Творожный сыр', emoji:'🧀', per100:{kcal:253,p:6,c:4,f:24,na:400,k:100}},
@@ -1745,92 +1726,41 @@ const FOOD_DB = [
   {name:'Сырники творожные', emoji:'🥞', per100:{kcal:220,p:14,c:22,f:9,na:200,k:150}},
   {name:'Глазированный сырок', emoji:'🍫', per100:{kcal:407,p:8,c:32,f:27,na:150,k:120}},
   /* ---- овощи, фрукты, орехи ---- */
-  {name:'Картофель отварной', emoji:'🥔', per100:{kcal:82,p:2,c:17,f:0.1,na:6,k:379}},
   {name:'Картошка фри', emoji:'🍟', per100:{kcal:312,p:3.4,c:41,f:15,na:210,k:580}},
   {name:'Пюре картофельное', emoji:'🥔', per100:{kcal:106,p:2,c:16,f:4,na:300,k:300}},
   {name:'Батат печёный', emoji:'🍠', per100:{kcal:90,p:2,c:21,f:0.1,na:36,k:475}},
-  {name:'Капуста белокочанная', emoji:'🥬', per100:{kcal:25,p:1.3,c:5,f:0.1,na:18,k:170}},
   {name:'Брокколи', emoji:'🥦', per100:{kcal:34,p:2.8,c:7,f:0.4,na:33,k:316}},
-  {name:'Цветная капуста', emoji:'🥦', per100:{kcal:25,p:1.9,c:5,f:0.3,na:30,k:299}},
   {name:'Кабачок', emoji:'🥒', per100:{kcal:17,p:1.2,c:3.1,f:0.3,na:8,k:261}},
   {name:'Баклажан', emoji:'🍆', per100:{kcal:25,p:1,c:6,f:0.2,na:2,k:229}},
   {name:'Свёкла отварная', emoji:'🫑', per100:{kcal:44,p:1.7,c:10,f:0.2,na:77,k:305}},
-  {name:'Авокадо', emoji:'🥑', per100:{kcal:160,p:2,c:9,f:15,na:7,k:485}},
   {name:'Шампиньоны', emoji:'🍄', per100:{kcal:22,p:3.1,c:3.3,f:0.3,na:5,k:318}},
-  {name:'Зелёный горошек', emoji:'🫘', per100:{kcal:81,p:5.4,c:14,f:0.4,na:5,k:244}},
-  {name:'Кукуруза консервированная', emoji:'🌽', per100:{kcal:96,p:3,c:19,f:1.2,na:270,k:130}},
   {name:'Фасоль красная (консервированная)', emoji:'🫘', per100:{kcal:99,p:6.7,c:15,f:0.5,na:250,k:380}},
-  {name:'Чечевица отварная', emoji:'🫘', per100:{kcal:116,p:9,c:20,f:0.4,na:2,k:369}},
-  {name:'Нут отварной', emoji:'🫘', per100:{kcal:164,p:8.9,c:27,f:2.6,na:7,k:291}},
-  {name:'Банан', emoji:'🍌', per100:{kcal:89,p:1.1,c:23,f:0.3,na:1,k:358}},
-  {name:'Яблоко', emoji:'🍎', per100:{kcal:52,p:0.3,c:14,f:0.2,na:1,k:107}},
-  {name:'Апельсин', emoji:'🍊', per100:{kcal:47,p:0.9,c:12,f:0.1,na:0,k:181}},
-  {name:'Мандарин', emoji:'🍊', per100:{kcal:53,p:0.8,c:13,f:0.3,na:2,k:166}},
-  {name:'Виноград', emoji:'🍇', per100:{kcal:69,p:0.7,c:18,f:0.2,na:2,k:191}},
-  {name:'Клубника', emoji:'🍓', per100:{kcal:33,p:0.7,c:8,f:0.3,na:1,k:153}},
   {name:'Голубика', emoji:'🫐', per100:{kcal:57,p:0.7,c:14,f:0.3,na:1,k:77}},
-  {name:'Арбуз', emoji:'🍉', per100:{kcal:30,p:0.6,c:8,f:0.2,na:1,k:112}},
-  {name:'Дыня', emoji:'🍈', per100:{kcal:34,p:0.8,c:8,f:0.2,na:16,k:267}},
-  {name:'Киви', emoji:'🥝', per100:{kcal:61,p:1.1,c:15,f:0.5,na:3,k:312}},
-  {name:'Груша', emoji:'🍐', per100:{kcal:57,p:0.4,c:15,f:0.1,na:1,k:116}},
-  {name:'Финики', emoji:'🎂', per100:{kcal:277,p:1.8,c:75,f:0.2,na:1,k:696}},
-  {name:'Курага', emoji:'🍑', per100:{kcal:241,p:3.4,c:63,f:0.5,na:10,k:1162}},
-  {name:'Изюм', emoji:'🍇', per100:{kcal:299,p:3.1,c:79,f:0.5,na:11,k:749}},
-  {name:'Грецкий орех', emoji:'🥜', per100:{kcal:654,p:15,c:14,f:65,na:2,k:441}},
-  {name:'Миндаль', emoji:'🥜', per100:{kcal:579,p:21,c:22,f:50,na:1,k:733}},
-  {name:'Кешью', emoji:'🥜', per100:{kcal:553,p:18,c:30,f:44,na:12,k:660}},
   {name:'Арахис', emoji:'🥜', per100:{kcal:567,p:26,c:16,f:49,na:18,k:705}},
-  {name:'Арахисовая паста', emoji:'🥜', per100:{kcal:588,p:25,c:20,f:50,na:430,k:649}},
   {name:'Семена чиа', emoji:'🌿', per100:{kcal:486,p:17,c:42,f:31,na:16,k:407}},
   /* ---- соусы, масла, сладкое ---- */
-  {name:'Масло оливковое', emoji:'🫒', per100:{kcal:884,p:0,c:0,f:100,na:2,k:1}},
-  {name:'Масло подсолнечное', emoji:'🫒', per100:{kcal:884,p:0,c:0,f:100,na:0,k:0}},
   {name:'Майонез 67%', emoji:'🥫', per100:{kcal:625,p:0.5,c:2.6,f:67,na:800,k:30}},
   {name:'Майонез лёгкий 30%', emoji:'🥫', per100:{kcal:300,p:0.6,c:6,f:30,na:900,k:30}},
-  {name:'Кетчуп', emoji:'🍅', per100:{kcal:98,p:1.3,c:23,f:0.2,na:900,k:280}},
-  {name:'Соевый соус', emoji:'🫙', per100:{kcal:53,p:8,c:5,f:0.1,na:5500,k:210}},
-  {name:'Горчица', emoji:'🫙', per100:{kcal:143,p:9.9,c:12,f:6,na:1100,k:150}},
-  {name:'Томатная паста', emoji:'🍅', per100:{kcal:82,p:4.3,c:19,f:0.5,na:59,k:1014}},
-  {name:'Сахар', emoji:'🧂', per100:{kcal:387,p:0,c:100,f:0,na:1,k:2}},
-  {name:'Мёд', emoji:'🍯', per100:{kcal:304,p:0.3,c:82,f:0,na:4,k:52}},
-  {name:'Шоколад молочный', emoji:'🍫', per100:{kcal:535,p:7.6,c:59,f:30,na:79,k:372}},
-  {name:'Шоколад тёмный 70%', emoji:'🍫', per100:{kcal:598,p:7.8,c:46,f:43,na:20,k:715}},
-  {name:'Печенье овсяное', emoji:'🍪', per100:{kcal:437,p:6,c:66,f:16,na:300,k:200}},
-  {name:'Вафли', emoji:'🧇', per100:{kcal:498,p:5,c:60,f:26,na:200,k:120}},
-  {name:'Пряник', emoji:'🍪', per100:{kcal:350,p:5,c:74,f:3,na:250,k:100}},
-  {name:'Зефир', emoji:'🍡', per100:{kcal:326,p:0.8,c:80,f:0,na:20,k:20}},
-  {name:'Мармелад', emoji:'🍬', per100:{kcal:321,p:0.4,c:79,f:0.1,na:15,k:20}},
   {name:'Торт Наполеон', emoji:'🍰', per100:{kcal:390,p:5,c:40,f:23,na:200,k:100}},
   {name:'Чизкейк', emoji:'🍰', per100:{kcal:321,p:5.5,c:26,f:22,na:340,k:130}},
-  {name:'Круассан', emoji:'🥐', per100:{kcal:406,p:8,c:45,f:21,na:450,k:120}},
   {name:'Пончик', emoji:'🍩', per100:{kcal:452,p:6,c:51,f:25,na:400,k:110}},
   {name:'Чипсы картофельные', emoji:'🥔', per100:{kcal:536,p:7,c:53,f:34,na:525,k:1275}},
   {name:'Сухарики', emoji:'🍞', per100:{kcal:400,p:11,c:70,f:9,na:1200,k:200}},
   /* ---- готовые блюда ---- */
-  {name:'Борщ', emoji:'🍜', per100:{kcal:49,p:1.6,c:6,f:2,na:350,k:200}},
-  {name:'Щи', emoji:'🍜', per100:{kcal:38,p:1.4,c:4,f:1.8,na:320,k:180}},
   {name:'Суп-пюре грибной', emoji:'🍜', per100:{kcal:70,p:2,c:7,f:4,na:400,k:180}},
   {name:'Плов с курицей', emoji:'🍛', per100:{kcal:190,p:9,c:24,f:7,na:400,k:200}},
-  {name:'Оливье', emoji:'🥗', per100:{kcal:198,p:5,c:8,f:16,na:450,k:200}},
   {name:'Сельдь под шубой', emoji:'🥗', per100:{kcal:190,p:6,c:9,f:14,na:600,k:230}},
-  {name:'Цезарь с курицей', emoji:'🥗', per100:{kcal:190,p:12,c:6,f:13,na:520,k:220}},
-  {name:'Греческий салат', emoji:'🥗', per100:{kcal:110,p:3,c:5,f:9,na:450,k:250}},
   {name:'Шаурма с курицей', emoji:'🌯', per100:{kcal:215,p:12,c:20,f:10,na:600,k:220}},
   {name:'Бургер чизбургер', emoji:'🍔', per100:{kcal:270,p:14,c:26,f:12,na:600,k:200}},
   {name:'Пицца Маргарита', emoji:'🍕', per100:{kcal:250,p:11,c:30,f:9,na:550,k:200}},
   {name:'Пицца Пепперони', emoji:'🍕', per100:{kcal:290,p:12,c:29,f:14,na:700,k:210}},
   {name:'Суши ролл Калифорния', emoji:'🍣', per100:{kcal:175,p:6,c:26,f:5,na:400,k:120}},
-  {name:'Блины с творогом', emoji:'🥞', per100:{kcal:210,p:9,c:26,f:8,na:300,k:150}},
   {name:'Сырники запечённые', emoji:'🥞', per100:{kcal:180,p:15,c:18,f:6,na:200,k:150}},
   {name:'Шашлык-лаваш (кебаб)', emoji:'🌯', per100:{kcal:230,p:13,c:22,f:11,na:620,k:230}},
   {name:'Наггетсы куриные', emoji:'🍗', per100:{kcal:296,p:15,c:16,f:19,na:600,k:250}},
   {name:'Пельмени сырые', emoji:'🥟', per100:{kcal:275,p:12,c:29,f:12,na:500,k:200}},
-  {name:'Вареники с картошкой', emoji:'🥟', per100:{kcal:180,p:5,c:33,f:3,na:350,k:220}},
-  {name:'Голубцы', emoji:'🥬', per100:{kcal:120,p:7,c:10,f:6,na:400,k:250}},
   /* ---- напитки ---- */
   {name:'Кофе с молоком (латте)', emoji:'☕️', per100:{kcal:42,p:2.3,c:4,f:1.9,na:40,k:120}},
-  {name:'Капучино', emoji:'☕️', per100:{kcal:37,p:2,c:3.5,f:1.7,na:35,k:110}},
-  {name:'Чай без сахара', emoji:'🍵', per100:{kcal:1,p:0,c:0.2,f:0,na:2,k:20}},
   {name:'Кола (сладкая газировка)', emoji:'🥤', per100:{kcal:42,p:0,c:10.6,f:0,na:5,k:2}},
   {name:'Кола без сахара (zero)', emoji:'🥤', per100:{kcal:0.3,p:0,c:0,f:0,na:8,k:2}},
   {name:'Энергетик (сладкий)', emoji:'🥤', per100:{kcal:45,p:0,c:11,f:0,na:40,k:10}},
@@ -1843,7 +1773,6 @@ const FOOD_DB = [
   /* ---- спортивное и добавки ---- */
   {name:'Казеин (порошок)', emoji:'🥤', per100:{kcal:360,p:78,c:5,f:2,na:200,k:600}},
   {name:'Гейнер (порошок)', emoji:'🥤', per100:{kcal:380,p:20,c:65,f:4,na:150,k:400}},
-  {name:'Протеиновый батончик', emoji:'🍫', per100:{kcal:350,p:30,c:35,f:10,na:300,k:400}},
   {name:'Креатин (5 г)', emoji:'💊', fixed:{kcal:0,p:0,c:0,f:0,na:0,k:0}},
   {name:'Омега-3 (капсула)', emoji:'💊', fixed:{kcal:9,p:0,c:0,f:1,na:0,k:0}},
   {name:'Магний цитрат (порция)', emoji:'💊', fixed:{kcal:0,p:0,c:0,f:0,na:0,k:0}},
@@ -3628,7 +3557,7 @@ function rankFoods(list){ return [...list].sort((a,b)=>((b.pinned?1:0)-(a.pinned
 let foodTab = 'search';
 function foodResultHtml(f, src){
   const enc = encodeURIComponent(JSON.stringify(f));
-  const per = f.per100 ? `${f.per100.kcal} ккал · Б ${f.per100.p} · У ${f.per100.c} · Ж ${f.per100.f} (на 100 г)` : (f.fixed? `${f.fixed.kcal} ккал порция` : '');
+  const per = f.per100 ? `${f.per100.kcal} ккал · Б ${f.per100.p} · У ${f.per100.c} · Ж ${f.per100.f} (на 100 г)` : (f.fixed? (f.unitLabel || `${f.fixed.kcal} ккал порция`) : '');
   return `<button class="food-result" data-act="pickFood" data-arg="${enc}">
     ${f.pub?'<span class="pub-badge">общий</span>':''}
     <div class="log-emoji">${f.emoji||'🍽'}</div>
@@ -4303,7 +4232,7 @@ function dayEditorHtml(ds){
   const w = (S.workoutLog[ds]||[]).length;
   return `
     <div class="sheet-title">${fmtDate(ds)}</div>
-    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал${w?` · тренировок: ${w}`:''}${daySteps(ds)?` · шагов: ${daySteps(ds).toLocaleString('ru-RU')}`:''}${dayBurned(ds)?` · сожжено ~${dayBurned(ds)} ккал`:''} · нажми на продукт, чтобы изменить граммовку</div>`
+    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал • ${Math.round(dayMacro(ds,'p'))} белка, ${Math.round(dayMacro(ds,'c'))} углеводов, ${Math.round(dayMacro(ds,'f'))} жиров${w?` • тренировок: ${w}`:''}${daySteps(ds)?` • шагов: ${daySteps(ds).toLocaleString('ru-RU')}`:''}${dayBurned(ds)?` • сожжено ~ ${dayBurned(ds)} ккал`:''} • нажми на продукт, чтобы изменить граммовку</div>`
     + (items.length ? items.map((it,i)=>`
       <div class="swipe-row">
         <div class="log-item" data-act="editLogItem" data-arg="${i}">
@@ -4313,7 +4242,7 @@ function dayEditorHtml(ds){
           <button class="log-del" data-act="delFood" data-arg="${i}">×</button>
         </div>
         <button class="swipe-del" data-act="delFood" data-arg="${i}">${TRASH_SVG}</button>
-      </div>`).join('') : `<div class="empty-hint">В этот день записей нет — добавь еду</div>`)
+      </div>`).join('') : `<div class="empty-hint">В этот день записей не было</div>`)
     + `<button class="btn-primary" style="margin-top:14px" data-act="openAddFoodForDay">Добавить еду</button>
     <div class="row2" style="margin-top:10px">
       <button class="btn-secondary" data-act="importSteps">Шаги</button>
@@ -4366,7 +4295,7 @@ function renderSettingsTab(){
       <div class="card" style="margin-top:14px">
         <div class="field-row"><div class="field-row-lbl">Целевой вес, кг</div><input class="field-row-input" id="sTarget" type="number" inputmode="decimal" value="${p.targetWeight}"></div>
       </div>
-      ${man?'<div class="settings-hint">Норма зафиксирована вручную — формула её не перезапишет. Цель выше влияет только на прогноз темпа</div>':''}`;
+      ${man?'<div class="settings-hint">Норма зафиксирована вручную, формула её не перезапишет. Цели выше влияют только на прогноз темпа</div>':''}`;
   }
   else if(ui.settingsTab==='look'){
     body = `
