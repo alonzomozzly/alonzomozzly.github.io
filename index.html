@@ -414,6 +414,12 @@ input[type=range].hard-slider::-webkit-slider-thumb{ -webkit-appearance:none; wi
 :root.dark .warn-banner{ background:rgba(255,204,0,.12); color:#ffd966; border-color:rgba(255,204,0,.35); }
 .trigger-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 .trigger-badge{ background:var(--card-2); color:var(--text); font-size:12px; font-weight:700; padding:6px 10px; border-radius:10px; }
+.skin-trend{ font-size:12.5px; font-weight:700; margin-left:8px; padding:3px 8px; border-radius:8px; vertical-align:middle; }
+.skin-trend.up{ background:rgba(52,199,89,.16); color:var(--green); }
+.skin-trend.down{ background:rgba(255,59,48,.16); color:var(--red); }
+.skin-trend.flat{ background:var(--card-2); color:var(--text-secondary); }
+.skin-scale{ margin-top:12px; }
+.skin-scale-current{ margin-top:8px; font-size:12.5px; font-weight:700; }
 .cal-legend{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; font-size:11px; color:var(--text-secondary); font-weight:600; }
 .cal-legend i{ width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:-1px; }
 .weight-hero{ text-align:center; padding:14px 0 4px; }
@@ -495,6 +501,9 @@ html.lg .modal{ background:var(--glass-bg); backdrop-filter:blur(30px) saturate(
 
 /* ---------- Еда ---------- */
 .search-input{ width:100%; border:none; background:var(--card); border-radius:14px; padding:14px 16px; font-size:16px; color:var(--text); outline:none; margin-bottom:14px; box-shadow:var(--shadow); }
+.filter-toggle-btn{ display:inline-flex; align-items:center; gap:4px; border:none; background:none; padding:0 0 10px; margin:-8px 0 0; font-size:13.5px; font-weight:700; color:var(--text-secondary); }
+.filter-toggle-chev{ font-size:10px; transition:transform .25s var(--ease-out); display:inline-block; }
+.filter-toggle-btn.open .filter-toggle-chev{ transform:rotate(180deg); }
 .food-tabs{ display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; scrollbar-width:none; }
 .food-tabs::-webkit-scrollbar{ display:none; }
 .food-tab{ border:none; background:var(--card); padding:9px 15px; border-radius:14px; font-size:13.5px; font-weight:700; color:var(--text-secondary); white-space:nowrap; cursor:pointer; }
@@ -635,7 +644,7 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
    кода, пока на телефоне уже работает новая (отсюда расхождения в цветах
    аналитики, стрике и т.п. — это две разные версии кода, а не проблема данных).
    Метка ниже нужно менять при каждом обновлении файла. */
-const APP_VERSION = '2026-09-03.1';
+const APP_VERSION = '2026-09-04.6';
 /* раз в визит и раз в 5 минут сверяем версию с самим собой (без кэша); если
    на сервере лежит уже другой файл — значит открыт устаревший кэш, обновляемся */
 async function checkForUpdate(){
@@ -917,7 +926,7 @@ function mergeStates(a, b){
   const sa = a.stamps || {}, sb = b.stamps || {};
   const out = {};
   const newer = (k)=> ((sb[k]||0) > (sa[k]||0)) ? b : a; /* при равных метках приоритет у первого (локального) */
-  ['profile','theme','goalShown'].forEach(k=>{ out[k] = clone(newer(k)[k]); });
+  ['profile','theme','goalShown','skinExp'].forEach(k=>{ out[k] = clone(newer(k)[k]); });
   out.stamps = {};
   Object.keys(sa).concat(Object.keys(sb)).forEach(k=>{ out.stamps[k] = Math.max(sa[k]||0, sb[k]||0); });
   out.tomb = {};
@@ -929,6 +938,12 @@ function mergeStates(a, b){
   out.stepsLog = mergeNumLog(a.stepsLog, b.stepsLog, sa, sb, 'steps:');
   out.retinoidLog = mergeStrLog(a.retinoidLog, b.retinoidLog, sa, sb, 'retinoid:');
   out.skinFeeling = mergeStrLog(a.skinFeeling, b.skinFeeling, sa, sb, 'feeling:');
+  out.skinCheck = mergeStrLog(a.skinCheck, b.skinCheck, sa, sb, 'skincheck:');
+  out.skinExpHistory = (function(){
+    const map = new Map();
+    (a.skinExpHistory||[]).concat(b.skinExpHistory||[]).forEach(e=>{ if(e && e.id) map.set(e.id, e); });
+    return Array.from(map.values()).sort((x,y)=> String(x.startDs).localeCompare(String(y.startDs)));
+  })();
   out.weightLog = mergeWeights(a.weightLog, b.weightLog, sa, sb);
   out.customFoods = mergeCustomFoods(a.customFoods, b.customFoods, out.tomb);
   out.foodFreq = mergeFreq(a.foodFreq, b.foodFreq);
@@ -940,7 +955,7 @@ function mergeStates(a, b){
 function contentSig(st){
   if(!st) return '';
   try{
-    return JSON.stringify([st.profile, st.theme, st.goalShown, st.foodLog, st.waterLog, st.stepsLog, st.workoutLog, st.skinLog, st.retinoidLog, st.skinFeeling, st.weightLog, st.customFoods, st.tomb]);
+    return JSON.stringify([st.profile, st.theme, st.goalShown, st.foodLog, st.waterLog, st.stepsLog, st.workoutLog, st.skinLog, st.retinoidLog, st.skinFeeling, st.skinCheck, st.skinExp, st.skinExpHistory, st.weightLog, st.customFoods, st.tomb]);
   }catch(e){ return String(Math.random()); }
 }
 
@@ -1042,6 +1057,8 @@ function snapshot(st){
     stepsLog: JSON.stringify(st.stepsLog||{}),
     retinoidLog: JSON.stringify(st.retinoidLog||{}),
     skinFeeling: JSON.stringify(st.skinFeeling||{}),
+    skinCheck: JSON.stringify(st.skinCheck||{}),
+    skinExp: JSON.stringify(st.skinExp||null),
     weightLog: JSON.stringify(st.weightLog||[]),
     foodLog: JSON.stringify(st.foodLog||{}),
     workoutLog: JSON.stringify(st.workoutLog||{}),
@@ -1081,13 +1098,13 @@ function autoStamp(){
   S.stamps = S.stamps || {}; S.tomb = S.tomb || {};
   const cur = snapshot(S);
   const prev = _snap;
-  ['profile','theme','goalShown'].forEach(k=>{ if(!prev || prev[k]!==cur[k]) S.stamps[k] = t; });
-  ['waterLog','stepsLog','retinoidLog','skinFeeling'].forEach(k=>{
+  ['profile','theme','goalShown','skinExp'].forEach(k=>{ if(!prev || prev[k]!==cur[k]) S.stamps[k] = t; });
+  ['waterLog','stepsLog','retinoidLog','skinFeeling','skinCheck'].forEach(k=>{
     if(prev && prev[k]===cur[k]) return;
     const before = prev ? JSON.parse(prev[k]) : {};
     const now = S[k] || {};
-    const pref = (k==='waterLog') ? 'water:' : (k==='stepsLog') ? 'steps:' : (k==='retinoidLog') ? 'retinoid:' : 'feeling:';
-    new Set(Object.keys(before).concat(Object.keys(now))).forEach(d=>{ if(before[d]!==now[d]) S.stamps[pref+d] = t; });
+    const pref = (k==='waterLog') ? 'water:' : (k==='stepsLog') ? 'steps:' : (k==='retinoidLog') ? 'retinoid:' : (k==='skinFeeling') ? 'feeling:' : 'skincheck:';
+    new Set(Object.keys(before).concat(Object.keys(now))).forEach(d=>{ if(JSON.stringify(before[d])!==JSON.stringify(now[d])) S.stamps[pref+d] = t; });
   });
   if(!prev || prev.weightLog!==cur.weightLog){
     const before = {}; (prev? JSON.parse(prev.weightLog) : []).forEach(e=> before[e.date] = e.weight);
@@ -1113,7 +1130,7 @@ function save(now){ clearTimeout(_saveTimer); _saveTimer = setTimeout(doSave, no
 function pruneHistory(){
   /* если данные разрослись — держим последние 180 дней и 250 частых продуктов */
   const cut = todayStr(new Date(Date.now()-180*86400000));
-  [S.foodLog, S.waterLog, S.stepsLog, S.workoutLog, S.skinLog, S.retinoidLog, S.skinFeeling].forEach(log=>{ if(log) Object.keys(log).forEach(d=>{ if(d<cut) delete log[d]; }); });
+  [S.foodLog, S.waterLog, S.stepsLog, S.workoutLog, S.skinLog, S.retinoidLog, S.skinFeeling, S.skinCheck].forEach(log=>{ if(log) Object.keys(log).forEach(d=>{ if(d<cut) delete log[d]; }); });
   if(Array.isArray(S.weightLog) && S.weightLog.length){
     /* чистим и историю веса, но последнюю запись всегда сохраняем (нужна для цели и аналитики) */
     const sorted = [...S.weightLog].sort((a,b)=> String(a.date).localeCompare(String(b.date)));
@@ -1264,9 +1281,12 @@ let S = {
   waterLog:{},         // {'YYYY-MM-DD': ml}
   stepsLog:{},         // {'YYYY-MM-DD': steps}
   workoutLog:{},       // {'YYYY-MM-DD':[{kind,label,mins,detail,kcal,time}]}
-  skinLog:{},          // {'YYYY-MM-DD':[{severity,zone,note,time}]} — трекер воспалений кожи
+  skinLog:{},          // {'YYYY-MM-DD':[{severity,zone,note,time} | {count,time}]} — трекер воспалений кожи
   retinoidLog:{},       // {'YYYY-MM-DD': true} — наносил ли актив/кислоту/ретиноид в этот день
-  skinFeeling:{},        // {'YYYY-MM-DD': 'dry'|'normal'|'irritation'} — ощущение кожи за день
+  skinFeeling:{},        // {'YYYY-MM-DD': 'dry'|'normal'|'irritation'} — ощущение кожи за день (dry = «стянуто»)
+  skinCheck:{},          // {'YYYY-MM-DD': {sleepLt6:bool, stress:bool}} — ответы из ежедневного чек-ина кожи
+  skinExp:null,          // {id,title,startDs} — активный эксперимент с кожей (один одновременно)
+  skinExpHistory:[],     // [{id,title,startDs,endDs,verdict}] — завершённые эксперименты
   theme:{dark:null,accent:'orange'},
   goalShown:false,
   stamps:{},           // метки времени правок — нужны для слияния между устройствами
@@ -1341,7 +1361,7 @@ function r1(x){ return Math.round(x*10)/10; }
 /* ================= Авто-теги продуктов (для связи с логом кожи) =================
    Автоматически, без участия пользователя, вешаем на каждый приём пищи скрытые теги
    по названию блюда — они нигде не показываются в обычном UI, а используются только
-   скриптом анализа пищевых триггеров кожи (см. skinFoodTriggers) */
+   скриптом анализа пищевых триггеров кожи (см. skinTriggerStats) */
 function autoTagFood(name){
   const n = String(name||'').toLowerCase();
   const has = (arr)=> arr.some(w=> n.includes(w));
@@ -2121,20 +2141,87 @@ function activityRating(ds){
 function dayDeficit(ds){ /* истинный дефицит: съедено − расход. Активность уже заложена в коэффициент TDEE, поэтому dayBurned повторно не вычитаем. Отрицательное = дефицит */ return dayTotal(ds) - Math.round(tdee(S.profile)); }
 function dayGoalDelta(ds){ /* отклонение от дневной цели: 0 = точно по плану. Активность уже учтена в норме через TDEE */ return dayTotal(ds) - goalCalories(S.profile); }
 
-/* ---- Здоровье кожи: индекс чистоты и воспаления ---- */
+/* ---- Здоровье кожи: индекс чистоты, динамика, триггеры, эксперименты ---- */
 const SKIN_SEVERITY = { light:{n:'Лёгкое', e:'🙂', pen:6}, medium:{n:'Среднее', e:'😐', pen:13}, strong:{n:'Сильное', e:'😣', pen:24} };
-const SKIN_ZONES = ['Лоб','Т-зона','Щёки','Подбородок','Нос','Другое'];
+const SKIN_ZONES = ['Лоб','Т-зона','Щёки','Подбородок','Нос','Другое']; // легаси-поле старых записей, в новой форме чек-ина не используется
 function dayInflammations(ds){ return S.skinLog[ds] || []; }
+/* «сколько воспалений в этот день» — старые записи (по одной, с severity) считаем
+   поштучно, новые записи чек-ина (с полем count) — по указанному числу */
+function dayInflammationCount(ds){
+  return dayInflammations(ds).reduce((s,it)=> s + (it.count!=null ? it.count : 1), 0);
+}
 function skinPurity(ds){
   const items = dayInflammations(ds);
   if(!items.length) return 100;
-  const penalty = items.reduce((s,i)=> s + ((SKIN_SEVERITY[i.severity]||{}).pen || 10), 0);
+  const penalty = items.reduce((s,it)=>{
+    if(it.severity) return s + ((SKIN_SEVERITY[it.severity]||{}).pen || 10);
+    return s + (it.count!=null ? it.count : 1) * SKIN_SEVERITY.medium.pen; /* новый чек-ин: считаем как «среднее» за штуку */
+  }, 0);
   return Math.max(0, 100 - penalty);
 }
-function skinRating(score){
-  if(score>=80) return {label:'Отличная', color:'#7be08a'};
-  if(score>=50) return {label:'Средняя', color:'#ffc247'};
-  return {label:'Требует внимания', color:'#ff8a80'};
+/* 5 ступеней шкалы — используются и для цвета/подписи, и для «полосы» под индексом */
+const SKIN_TIERS = [
+  { min:92, label:'Прекрасно',     sub:'воспалений нет',      color:'#34c759' },
+  { min:80, label:'Контролируемо', sub:'немного воспалений',   color:'#9ad14b' },
+  { min:65, label:'Немного хуже',  sub:'умеренные высыпания',  color:'#ffc247' },
+  { min:30, label:'Плохо',         sub:'высыпаний много',      color:'#ff8a1e' },
+  { min:0,  label:'Критически',    sub:'коже очень плохо',     color:'#ff3b30' },
+];
+function skinTier(score){ return SKIN_TIERS.find(t=> score>=t.min) || SKIN_TIERS[SKIN_TIERS.length-1]; }
+/* был ли в этот день хоть какой-то чек-ин (ощущение или воспаление) — отличаем
+   «день без записей» (индекс по умолчанию 100, но это не значит «кожа идеальна») */
+function hasSkinCheckin(ds){ return S.skinFeeling[ds]!=null || dayInflammations(ds).length>0; }
+function skinCheckinDays(n){ return lastDays(n).filter(hasSkinCheckin).length; }
+/* динамика за 7 дней: сравниваем среднее последних 3 дней со средним предыдущих 4 —
+   считаем только по дням с реальным чек-ином, иначе «пустые» дни (индекс по
+   умолчанию 100) искусственно тянут тренд в плюс */
+function skinTrend7d(){
+  const days = lastDays(7); // [сегодня ... 6 дней назад]
+  const recent = days.slice(0,3).filter(hasSkinCheckin);
+  const prior = days.slice(3,7).filter(hasSkinCheckin);
+  if(recent.length<2 || prior.length<2) return null;
+  const avg = (arr)=> arr.reduce((s,d)=>s+skinPurity(d),0)/arr.length;
+  const diff = avg(recent) - avg(prior);
+  if(diff>=5) return 'up';
+  if(diff<=-5) return 'down';
+  return 'flat';
+}
+
+/* ---- пищевые триггеры: используем скрытые авто-теги еды (см. autoTagFood выше) ---- */
+function dayFoodHasTag(ds, tag){
+  return (S.foodLog[ds]||[]).some(it=> (it.tags||[]).includes(tag));
+}
+/* по каждому фактору: среди дней, где фактор был, в каком % на след. день (или тот же для сна/стресса) была вспышка */
+function skinTriggerStats(){
+  const days = lastDays(90).slice(1); // без сегодняшнего — он ещё не завершён
+  function pct(hasFn, sameDay){
+    let hit=0, tot=0;
+    days.forEach(d=>{
+      if(!hasFn(d)) return;
+      const reactDs = sameDay ? d : todayStr(new Date(new Date(d+'T00:00:00').getTime()+86400000));
+      if(!hasSkinCheckin(reactDs)) return; // нет чек-ина в день реакции — не считаем
+      tot++;
+      if(dayInflammationCount(reactDs)>0) hit++;
+    });
+    return tot>=3 ? Math.round(hit/tot*100) : null;
+  }
+  return {
+    dairy:   pct(d=>dayFoodHasTag(d, 'молочка'), false),
+    carbs:   pct(d=>dayFoodHasTag(d, 'быстрые угли'), false),
+    sleep:   pct(d=> S.skinCheck[d] && S.skinCheck[d].sleepLt6===true, true),
+    stress:  pct(d=> S.skinCheck[d] && S.skinCheck[d].stress===true, true),
+  };
+}
+function skinPatternText(stats){
+  if(stats.dairy!=null && stats.dairy>=85) return `🥛 Молочный белок — подтверждённый триггер: воспаления после него случаются в ${stats.dairy}% случаев`;
+  if(stats.carbs!=null && stats.carbs>=85) return `🍬 Быстрые углеводы — подтверждённый триггер: воспаления после них случаются в ${stats.carbs}% случаев`;
+  const best = [['sleep',stats.sleep],['stress',stats.stress]].filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1])[0];
+  if(best && best[1]>=45){
+    return best[0]==='sleep'
+      ? 'Ваша кожа, как правило, ухудшается через 1-2 дня после недосыпа'
+      : 'Ваша кожа часто реагирует высыпаниями на дни с повышенным стрессом';
+  }
+  return 'Точный триггер в продуктах пока не найден';
 }
 
 /* ---- стрик с заморозками (3 в месяц) ---- */
@@ -2170,10 +2257,11 @@ const app = document.getElementById('app');
 /* приводим состояние к рабочему виду: битая/частичная копия (старый бэкап,
    неполное облако) больше не роняет рендер на первом же обращении к полю */
 function normalizeState(){
-  ['foodLog','waterLog','stepsLog','workoutLog','skinLog','retinoidLog','skinFeeling','foodFreq','stamps','tomb'].forEach(k=>{
+  ['foodLog','waterLog','stepsLog','workoutLog','skinLog','retinoidLog','skinFeeling','skinCheck','foodFreq','stamps','tomb'].forEach(k=>{
     if(!S[k] || typeof S[k]!=='object' || Array.isArray(S[k])) S[k] = {};
   });
-  ['weightLog','customFoods'].forEach(k=>{ if(!Array.isArray(S[k])) S[k] = []; });
+  ['weightLog','customFoods','skinExpHistory'].forEach(k=>{ if(!Array.isArray(S[k])) S[k] = []; });
+  if(S.skinExp && typeof S.skinExp!=='object') S.skinExp = null;
   if(!S.theme || typeof S.theme!=='object') S.theme = {dark:null, accent:'orange'};
   if(typeof S.theme.accent!=='string') S.theme.accent = 'orange';
   if(S.profile && typeof S.profile!=='object') S.profile = null;
@@ -2984,7 +3072,7 @@ ACTIONS.infoWater = ()=> openModal(`
   <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
 
 /* ================= Здоровье кожи ================= */
-const FEEL_OPTS = [ {k:'dry', n:'Сухо', e:'🌵'}, {k:'normal', n:'Нормально', e:'🙂'}, {k:'irritation', n:'Раздражение', e:'🔴'} ];
+const FEEL_OPTS = [ {k:'normal', n:'Хорошо', e:'🙂'}, {k:'dry', n:'Стянуто', e:'🌵'}, {k:'irritation', n:'Раздражение', e:'🔴'} ];
 /* сколько дней подряд (включая ds) юзер отмечал нанесение актива/кислоты/ретиноида */
 function retinoidStreak(ds){
   let n = 0, cur = ds;
@@ -2999,29 +3087,25 @@ function retinoidBurnRisk(ds){
   const feeling = S.skinFeeling[ds];
   return retinoidStreak(ds) >= 2 && (feeling==='dry' || feeling==='irritation');
 }
-const FOOD_TRIGGER_LABELS = { 'молочка':'Молочный белок', 'быстрые угли':'Высокий ГИ', 'соль':'Избыток натрия' };
-/* сканирует историю еды за последние 48ч (сегодня + вчера) в поисках скрытых тегов */
-function skinFoodTriggers(ds){
-  const y = todayStr(new Date(new Date(ds+'T00:00:00').getTime() - 86400000));
-  const items = [].concat(S.foodLog[ds]||[], S.foodLog[y]||[]);
-  const tagSet = new Set();
-  items.forEach(it=> (it.tags||[]).forEach(t=> tagSet.add(t)));
-  const badges = Array.from(tagSet).map(t=> FOOD_TRIGGER_LABELS[t] || t);
-  return { count: badges.length, badges };
-}
 function skinTrendHtml(){
   const ds = todayStr();
   const days7 = lastDays(7).reverse();
   return days7.map(d=>{
-    const has = dayInflammations(d).length>0;
-    const p = skinPurity(d);
-    let cls = 'ok';
-    if(has){ cls = p<50 ? 'bad' : (p<80 ? 'warn' : 'ok'); } else { cls = ''; }
-    if(retinoidBurnRisk(d)) cls += ' retinoid'; /* жёлтый — риск ретиноидного ожога в этот день */
-    return `<div class="cal-cell ${cls}${d===ds?' today':''}" data-act="openSkinDay" data-arg="${d}">${parseInt(d.slice(8),10)}</div>`;
+    const checked = hasSkinCheckin(d);
+    const tier = skinTier(skinPurity(d));
+    const style = checked ? `background:${tier.color}30;color:${tier.color}` : '';
+    const cls = retinoidBurnRisk(d) ? ' retinoid' : '';
+    return `<div class="cal-cell${cls}${d===ds?' today':''}" style="${style}" data-act="openSkinDay" data-arg="${d}">${parseInt(d.slice(8),10)}</div>`;
   }).join('');
 }
 function inflammationItemHtml(it,i){
+  if(it.count!=null){
+    return `<div class="workout-item rise">
+      <div class="workout-icon">😣</div>
+      <div class="workout-info"><div class="workout-name">Новых воспалений: ${it.count}</div><div class="workout-detail">${it.time||''}</div></div>
+      <button class="log-del" data-act="delInflammation" data-arg="${i}">×</button>
+    </div>`;
+  }
   const sev = SKIN_SEVERITY[it.severity] || SKIN_SEVERITY.light;
   return `<div class="workout-item rise">
     <div class="workout-icon">${sev.e}</div>
@@ -3029,106 +3113,58 @@ function inflammationItemHtml(it,i){
     <button class="log-del" data-act="delInflammation" data-arg="${i}">×</button>
   </div>`;
 }
+/* «полоса» шкалы чистоты — одним цветом текущего уровня, заполнение пропорционально индексу */
+function skinScaleHtml(purity){
+  const t = skinTier(purity);
+  return `<div class="skin-scale">
+    <div class="metric-bar" style="margin-top:0"><i style="width:${purity}%;background:${t.color};box-shadow:none"></i></div>
+    <div class="skin-scale-current" style="color:${t.color}">${t.label} · ${t.sub}</div>
+  </div>`;
+}
+/* «Твои триггеры кожи» + «Закономерность» — считаются только если есть свежие отметки */
+function skinInsightsHtml(){
+  if(skinCheckinDays(7) < 3){
+    return `<div class="metric-card rise" style="animation-delay:.07s">
+      <div class="metric-lbl">Твои триггеры кожи:</div>
+      <div class="metric-big"><span class="val">Мало данных</span></div>
+    </div>`;
+  }
+  const stats = skinTriggerStats();
+  const rows = [ ['🥛','Молочный белок', stats.dairy], ['🍬','Быстрые углеводы', stats.carbs], ['😴','Сон <6 часов', stats.sleep], ['😵','Стресс', stats.stress] ];
+  return `<div class="metric-card rise" style="animation-delay:.07s">
+    <div class="metric-lbl">Твои триггеры кожи:</div>
+    <div style="margin-top:8px">${rows.map(([e,n,p])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13.5px"><div>${e} ${n}</div><div style="font-weight:700">${p!=null? p+'%' : '—'}</div></div>`).join('')}</div>
+    <div class="metric-note" style="margin-top:8px">📊 Закономерность: ${skinPatternText(stats)}</div>
+  </div>`;
+}
 function skinHtml(){
   const ds = todayStr();
   const purity = skinPurity(ds);
-  const rating = skinRating(purity);
   const items = dayInflammations(ds);
-  const feeling = S.skinFeeling[ds] || null;
-  const retinoidToday = !!S.retinoidLog[ds];
   const burnRisk = retinoidBurnRisk(ds);
-  const triggers = skinFoodTriggers(ds);
+  const trend = skinTrend7d();
+  const trendHtml = trend ? `<span class="skin-trend ${trend}">${trend==='up'?'↑ улучшение':trend==='down'?'↓ ухудшение':'→ стабильно'} (7 дн.)</span>` : '';
   return `
     <div class="sheet-title">Здоровье кожи</div>
     ${burnRisk ? `<div class="warn-banner">⚠️ Внимание: Высокий риск ретиноидного ожога. Сделай перерыв в активах на 48 часов, нанеси увлажняющий крем</div>` : ''}
 
-    <div class="metric-card rise">
-      <button class="info-dot" data-act="infoSkin">${ic('info')}</button>
+    <div class="metric-card rise" data-act="openSkinCheckin" style="cursor:pointer">
       <div class="metric-lbl">Индекс чистоты сегодня:</div>
-      <div class="metric-big"><span class="val" style="color:${rating.color}">${purity}</span><span class="limit2"> / 100</span></div>
-      <div class="metric-bar"><i style="width:${purity}%;background:${rating.color};box-shadow:none"></i></div>
-      <div class="metric-note">${rating.label}${items.length? ' · воспалений сегодня: '+items.length : ' · воспалений не отмечено'}</div>
+      <div class="metric-big"><span class="val" style="color:${skinTier(purity).color}">${purity}</span><span class="limit2"> / 100</span>${trendHtml}</div>
+      ${skinScaleHtml(purity)}
     </div>
 
-    <div class="metric-card rise" style="animation-delay:.04s">
-      <div class="metric-lbl">Ощущение сегодня:</div>
-      <div class="eff-grid cols3" id="feelGrid">${FEEL_OPTS.map(o=>`<button class="eff-btn ${feeling===o.k?'active':''}" data-act="setFeeling" data-arg="${o.k}"><span class="eff-emoji">${o.e}</span>${o.n}</button>`).join('')}</div>
-    </div>
+    ${skinInsightsHtml()}
 
-    <div class="metric-card rise" style="animation-delay:.05s">
-      <div class="theme-toggle-row" data-act="toggleRetinoid"><div>Нанёс актив / кислоту / наружный ретиноид</div><div class="switch ${retinoidToday?'on':''}"><div class="knob"></div></div></div>
-    </div>
-
-    ${triggers.count ? `
-    <div class="metric-card rise" style="animation-delay:.06s">
-      <div class="metric-lbl">Пищевые триггеры за 48 часов:</div>
-      <div class="trigger-row">${triggers.badges.map(b=>`<span class="trigger-badge">[${escapeHtml(b)}]</span>`).join('')}</div>
-      <div class="metric-note" style="color:${triggers.count>=2?'var(--red)':'var(--accent-2)'}">Обнаружено ${triggers.count} пищевых триггеров. Риск обострения: ${triggers.count>=2?'Высокий':'Средний'}</div>
-    </div>` : ''}
-
-    <div class="metric-card rise" style="animation-delay:.07s">
+    <div class="metric-card rise" style="animation-delay:.09s">
       <div class="metric-lbl">Последние 7 дней:</div>
       <div class="calendar-grid" style="margin-top:12px">${skinTrendHtml()}</div>
     </div>
 
     <div class="section-title">Воспаления сегодня</div>
-    ${items.length ? items.map((it,i)=>inflammationItemHtml(it,i)).join('') : '<div class="empty-hint">Пока не отмечено. Если появились высыпания — запиши, чтобы отследить динамику</div>'}
-    <button class="btn-primary" style="margin-top:14px" data-act="formInflammation">Добавить воспаление</button>`;
+    ${items.length ? items.map((it,i)=>inflammationItemHtml(it,i)).join('') : '<div class="empty-hint">Пока не отмечено. Нажми на индекс чистоты выше, чтобы отметить состояние кожи</div>'}`;
 }
 ACTIONS.openSkinDay = (arg)=>{ if(arg) showToast(`${fmtDate(arg)}: индекс чистоты ${skinPurity(arg)}`); };
-ACTIONS.infoSkin = ()=> openModal(`
-  <div class="modal-title">Индекс чистоты кожи</div>
-  <div class="modal-text">Индекс начинается со 100 и снижается за каждое отмеченное воспаление: лёгкое −6, среднее −13, сильное −24</div>
-  <div class="modal-text">Отмечай высыпания по мере появления — так будет видна связь с питанием, сном и уходом за кожей</div>
-  <button class="btn-secondary" style="margin-top:16px" data-act="closeModal">Понятно</button>`);
-ACTIONS.setFeeling = (arg)=>{
-  const ds = todayStr();
-  S.skinFeeling[ds] = arg;
-  save(true); haptic('light');
-  const risk = retinoidBurnRisk(ds);
-  openSheet(skinHtml());
-  if(risk) showToast('Высокий риск ретиноидного ожога — сделай перерыв 48ч');
-};
-ACTIONS.toggleRetinoid = ()=>{
-  const ds = todayStr();
-  S.retinoidLog[ds] = !S.retinoidLog[ds];
-  save(true); haptic('light');
-  const risk = retinoidBurnRisk(ds);
-  openSheet(skinHtml());
-  if(risk) showToast('Высокий риск ретиноидного ожога — сделай перерыв 48ч');
-};
-
-const skinDraft = { severity:null, zone:null };
-function syncSkinForm(){
-  const btn = document.getElementById('skinSaveBtn');
-  if(btn) btn.disabled = !(skinDraft.severity && skinDraft.zone);
-}
-ACTIONS.formInflammation = ()=>{
-  skinDraft.severity = null; skinDraft.zone = null;
-  openSheet(`
-    <div class="sheet-title">Воспаление</div>
-    <div class="field-label">Насколько выражено?</div>
-    <div class="eff-grid" id="sevGrid">${Object.entries(SKIN_SEVERITY).map(([k,v])=>`<button class="eff-btn" data-sev="${k}"><span class="eff-emoji">${v.e}</span>${v.n}</button>`).join('')}</div>
-    <div class="field-label" style="margin-top:14px">Где?</div>
-    <div class="pill-row" id="zoneRow">${SKIN_ZONES.map(z=>`<button class="pill" data-zone="${z}">${z}</button>`).join('')}</div>
-    <button class="btn-primary" style="margin-top:14px" id="skinSaveBtn" data-act="saveInflammation" disabled>Записать</button>`);
-  document.querySelectorAll('#sevGrid .eff-btn').forEach(b=>{ b.onclick = ()=>{
-    document.querySelectorAll('#sevGrid .eff-btn').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active'); skinDraft.severity = b.dataset.sev; haptic('light'); syncSkinForm();
-  };});
-  document.querySelectorAll('#zoneRow .pill').forEach(p=>{ p.onclick = ()=>{
-    document.querySelectorAll('#zoneRow .pill').forEach(x=>x.classList.remove('active'));
-    p.classList.add('active'); skinDraft.zone = p.dataset.zone; haptic('light'); syncSkinForm();
-  };});
-};
-ACTIONS.saveInflammation = ()=>{
-  if(!(skinDraft.severity && skinDraft.zone)){ showToast('Заполни выраженность и зону'); return; }
-  const ds = todayStr();
-  (S.skinLog[ds] = S.skinLog[ds]||[]).push({ severity:skinDraft.severity, zone:skinDraft.zone, time:nowTime() });
-  save(true); haptic('ok');
-  openSheet(skinHtml()); /* пересчитывает и показывает обновлённый Индекс чистоты кожи */
-  showToast('Записано');
-};
 ACTIONS.delInflammation = (arg)=>{
   const ds = todayStr();
   (S.skinLog[ds]||[]).splice(parseInt(arg),1);
@@ -3136,6 +3172,109 @@ ACTIONS.delInflammation = (arg)=>{
   openSheet(skinHtml());
 };
 
+/* ---- чек-ин кожи: ощущение (колесо-скролл) → новые воспаления → сон/стресс ---- */
+const skinCheckDraft = { feeling:null, hasNew:null, count:null, sleepLt6:null, stress:null };
+function syncSkinCheckSteps(){
+  const showNew = skinCheckDraft.hasNew===true;
+  setStep('scqCount', showNew);
+  setStep('scqSleep', showNew);
+  setStep('scqStress', showNew);
+  const newOk = skinCheckDraft.hasNew===false || (showNew && skinCheckDraft.count>0 && skinCheckDraft.sleepLt6!=null && skinCheckDraft.stress!=null);
+  setStep('scqSave', skinCheckDraft.feeling!=null && skinCheckDraft.hasNew!=null && newOk);
+}
+function bindSkinCheckWheel(startIdx){
+  const wheel = document.getElementById('skinFeelWheel');
+  const items = wheel.querySelectorAll('.wheel-item');
+  const itemH = 40;
+  let _lastIdx = startIdx;
+  function updateSel(){
+    const idx = Math.max(0, Math.min(FEEL_OPTS.length-1, Math.round(wheel.scrollTop/itemH)));
+    items.forEach((it,i)=>it.classList.toggle('selected', i===idx));
+    skinCheckDraft.feeling = FEEL_OPTS[idx].k;
+    syncSkinCheckSteps();
+  }
+  wheel.addEventListener('scroll', ()=>{
+    clearTimeout(wheel._t);
+    updateSel();
+    const cur = Math.round(wheel.scrollTop/itemH);
+    if(cur!==_lastIdx){ _lastIdx = cur; drumTick(); haptic('selection'); }
+    wheel._t = setTimeout(()=>{ const idx = Math.round(wheel.scrollTop/itemH); wheel.scrollTo({top: idx*itemH, behavior:'smooth'}); }, 120);
+  });
+  requestAnimationFrame(()=>{ wheel.scrollTop = startIdx*itemH; updateSel(); });
+  const cnt = document.getElementById('scCount');
+  if(cnt) cnt.oninput = (e)=>{ skinCheckDraft.count = parseInt(e.target.value)||null; syncSkinCheckSteps(); };
+}
+ACTIONS.openSkinCheckin = ()=>{
+  const ds = todayStr();
+  skinCheckDraft.feeling = S.skinFeeling[ds] || null;
+  skinCheckDraft.hasNew = null; skinCheckDraft.count = null; skinCheckDraft.sleepLt6 = null; skinCheckDraft.stress = null;
+  const startIdx = Math.max(0, FEEL_OPTS.findIndex(o=>o.k===skinCheckDraft.feeling));
+  openSheet(`
+    <div class="sheet-title">Как кожа сегодня?</div>
+    <div class="field-label">Как ощущается кожа?</div>
+    <div class="wheel-wrap" style="height:160px;margin:10px 0">
+      <div class="wheel" id="skinFeelWheel" style="height:160px"><div class="wheel-pad" style="height:60px"></div>${FEEL_OPTS.map((o,i)=>`<div class="wheel-item" data-v="${i}">${o.e} ${o.n}</div>`).join('')}<div class="wheel-pad" style="height:60px"></div></div>
+      <div class="wheel-frame" style="top:60px"></div>
+    </div>
+    <div class="step-block revealed" id="scqNew">
+      <div class="field-label">Появились новые воспаления?</div>
+      <div class="row2"><button class="btn-secondary" id="scNewYes" data-act="skinCheckNew" data-arg="1">Да</button><button class="btn-secondary" id="scNewNo" data-act="skinCheckNew" data-arg="0">Нет</button></div>
+    </div>
+    <div class="step-block" id="scqCount">
+      <div class="field-label">Сколько новых воспалений?</div>
+      <input class="plain-input" id="scCount" type="number" inputmode="numeric" placeholder="Например: 2">
+    </div>
+    <div class="step-block" id="scqSleep">
+      <div class="field-label">Ты спал больше 6 часов?</div>
+      <div class="row2"><button class="btn-secondary" id="scSleepYes" data-act="skinCheckSleep" data-arg="1">Да</button><button class="btn-secondary" id="scSleepNo" data-act="skinCheckSleep" data-arg="0">Нет</button></div>
+    </div>
+    <div class="step-block" id="scqStress">
+      <div class="field-label">У тебя было много стресса сегодня?</div>
+      <div class="row2"><button class="btn-secondary" id="scStressYes" data-act="skinCheckStress" data-arg="1">Да</button><button class="btn-secondary" id="scStressNo" data-act="skinCheckStress" data-arg="0">Нет</button></div>
+    </div>
+    <div class="step-block" id="scqSave">
+      <button class="btn-primary" style="margin-top:4px" data-act="saveSkinCheckin">Сохранить</button>
+    </div>`);
+  bindSkinCheckWheel(startIdx);
+  syncSkinCheckSteps();
+};
+ACTIONS.skinCheckNew = (arg)=>{
+  skinCheckDraft.hasNew = (arg==='1');
+  const y = document.getElementById('scNewYes'), n = document.getElementById('scNewNo');
+  if(y) y.classList.toggle('active', arg==='1');
+  if(n) n.classList.toggle('active', arg==='0');
+  haptic('light'); syncSkinCheckSteps();
+};
+ACTIONS.skinCheckSleep = (arg)=>{
+  skinCheckDraft.sleepLt6 = (arg==='0'); /* «Нет» на вопрос «спал больше 6ч?» = спал меньше 6 часов */
+  const y = document.getElementById('scSleepYes'), n = document.getElementById('scSleepNo');
+  if(y) y.classList.toggle('active', arg==='1');
+  if(n) n.classList.toggle('active', arg==='0');
+  haptic('light'); syncSkinCheckSteps();
+};
+ACTIONS.skinCheckStress = (arg)=>{
+  skinCheckDraft.stress = (arg==='1');
+  const y = document.getElementById('scStressYes'), n = document.getElementById('scStressNo');
+  if(y) y.classList.toggle('active', arg==='1');
+  if(n) n.classList.toggle('active', arg==='0');
+  haptic('light'); syncSkinCheckSteps();
+};
+ACTIONS.saveSkinCheckin = ()=>{
+  if(!skinCheckDraft.feeling){ showToast('Выбери, как ощущается кожа'); return; }
+  const ds = todayStr();
+  S.skinFeeling[ds] = skinCheckDraft.feeling;
+  if(skinCheckDraft.hasNew){
+    const n = Math.max(1, parseInt(skinCheckDraft.count)||0);
+    (S.skinLog[ds] = S.skinLog[ds]||[]).push({ count:n, time:nowTime() });
+    S.skinCheck[ds] = { sleepLt6: !!skinCheckDraft.sleepLt6, stress: !!skinCheckDraft.stress };
+  }
+  save(true); haptic('ok');
+  const risk = retinoidBurnRisk(ds);
+  openSheet(skinHtml());
+  showToast(risk ? 'Высокий риск ретиноидного ожога — сделай перерыв 48ч' : 'Записано');
+};
+
+/* ---- эксперименты со кожей: сравнение индекса «до» и «во время» ---- */
 /* ================= Активность ================= */
 function renderActivityTab(){
   const ds = todayStr();
@@ -3413,7 +3552,7 @@ function renderFoodTab(){
       <div class="section-title">Съедено сегодня:</div>
       ${items.length? items.map((it,i)=>`
         <div class="swipe-row rise" style="animation-delay:${Math.min(i*0.04,0.3)}s">
-          <div class="log-item" data-act="editLogItem" data-arg="${i}">
+          <div class="log-item"${it.imported?'':' data-act="editLogItem"'} data-arg="${i}">
             <div class="log-emoji">${it.emoji||'🍽'}</div>
             <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
             <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
@@ -3433,10 +3572,10 @@ ACTIONS.delFood = (arg)=>{
 };
 ACTIONS.editLogItem = (arg)=>{
   const i = parseInt(arg), ds = logDs();
-  const it = (S.foodLog[ds]||[])[i]; if(!it) return;
+  const it = (S.foodLog[ds]||[])[i]; if(!it || it.imported) return; /* импортированная запись — не продукт, граммовку не меняем */
   openModal(`
     <div class="modal-title">${escapeHtml(it.name)}</div>
-    <div class="modal-text">Измени граммовку — калории и БЖУ пересчитаются пропорционально${it.grams?'':' (текущая порция принята за 100 г)'}</div>
+    <div class="modal-text">Поменяй граммовку продукта, калории и БЖУ пересчитаются пропорционально</div>
     <input class="plain-input" id="editGramsInput" type="number" inputmode="decimal" value="${it.grams||100}" style="margin-top:12px">
     <button class="btn-primary" style="margin-top:14px" data-act="saveLogGrams" data-arg="${i}">Сохранить</button>`);
 };
@@ -3555,6 +3694,29 @@ function rankFoods(list){ return [...list].sort((a,b)=>((b.pinned?1:0)-(a.pinned
 
 /* ================= Лист «Добавить еду» ================= */
 let foodTab = 'search';
+/* фильтры поиска: набор активных ключей, AND между ними. Значения — по данным на 100 г,
+   поэтому не применяются к «порционным» продуктам без per100 (капсулы, готовые порции) */
+let foodFilters = new Set();
+const FOOD_FILTERS = [
+  { k:'pub',       l:'Общие' },
+  { k:'protein',   l:'Много белка' },
+  { k:'lowcal',    l:'Низкая калорийность' },
+  { k:'potassium', l:'Много калия' },
+  { k:'lowcarb',   l:'Мало углеводов' },
+];
+function foodMatchesFilters(f, filters){
+  if(!filters.size) return true;
+  const per = f.per100 || null;
+  for(const key of filters){
+    if(key==='pub'){ if(!f.pub) return false; continue; }
+    if(!per) return false; /* порционный продукт без данных на 100 г — под остальные фильтры не попадает */
+    if(key==='protein' && !(per.p>=15)) return false;
+    if(key==='lowcal' && !(per.kcal<=100)) return false;
+    if(key==='potassium' && !((per.k||0)>=300)) return false;
+    if(key==='lowcarb' && !(per.c<=5)) return false;
+  }
+  return true;
+}
 function foodResultHtml(f, src){
   const enc = encodeURIComponent(JSON.stringify(f));
   const per = f.per100 ? `${f.per100.kcal} ккал · Б ${f.per100.p} · У ${f.per100.c} · Ж ${f.per100.f} (на 100 г)` : (f.fixed? (f.unitLabel || `${f.fixed.kcal} ккал порция`) : '');
@@ -3572,16 +3734,37 @@ function addFoodHtml(){
     <div class="food-tabs">${tabs.map(t=>`<button class="food-tab ${foodTab===t.k?'active':''}" data-act="foodTab" data-arg="${t.k}">${t.l}</button>`).join('')}</div>
     <div id="foodTabBody"></div>`;
 }
-ACTIONS.openAddFood = ()=>{ editDs = null; foodTab = 'search'; openSheet(addFoodHtml()); renderFoodTabBody(); refreshPublicFoodsIfStale(); };
-ACTIONS.openAddFoodForDay = ()=>{ foodTab = 'search'; openSheet(addFoodHtml()); renderFoodTabBody(); refreshPublicFoodsIfStale(); };
+ACTIONS.openAddFood = ()=>{ editDs = null; foodTab = 'search'; foodFilters = new Set(); openSheet(addFoodHtml()); renderFoodTabBody(); refreshPublicFoodsIfStale(); };
+ACTIONS.openAddFoodForDay = ()=>{ foodTab = 'search'; foodFilters = new Set(); openSheet(addFoodHtml()); renderFoodTabBody(); refreshPublicFoodsIfStale(); };
 ACTIONS.foodTab = (arg)=>{ stopScanner(); foodTab = arg; openSheet(addFoodHtml()); renderFoodTabBody(); refreshPublicFoodsIfStale(); };
+ACTIONS.toggleFoodFilters = (arg, el)=>{
+  const panel = document.getElementById('foodFiltersPanel');
+  if(!panel) return;
+  const open = panel.classList.toggle('revealed');
+  if(el) el.classList.toggle('open', open);
+  haptic('light');
+};
+ACTIONS.toggleFoodFilter = (arg, el)=>{
+  if(foodFilters.has(arg)) foodFilters.delete(arg); else foodFilters.add(arg);
+  if(el) el.classList.toggle('active', foodFilters.has(arg));
+  const btn = document.querySelector('.filter-toggle-btn');
+  if(btn){ const n = foodFilters.size; btn.innerHTML = `Фильтры${n?' · '+n:''} <span class="filter-toggle-chev">▾</span>`; }
+  haptic('light');
+  const inp = document.getElementById('foodSearch');
+  doFoodSearch(inp ? inp.value : '');
+};
 
 function renderFoodTabBody(){
   const body = document.getElementById('foodTabBody');
   if(!body) return;
   if(foodTab==='search'){
+    const activeN = foodFilters.size;
     body.innerHTML = `
       <input class="search-input" id="foodSearch" type="text" placeholder="Курица, гречка, творог…" autocomplete="off">
+      <button class="filter-toggle-btn" data-act="toggleFoodFilters">Фильтры${activeN?' · '+activeN:''} <span class="filter-toggle-chev">▾</span></button>
+      <div class="step-block" id="foodFiltersPanel">
+        <div class="pill-row">${FOOD_FILTERS.map(x=>`<button class="pill ${foodFilters.has(x.k)?'active':''}" data-act="toggleFoodFilter" data-arg="${x.k}">${x.l}</button>`).join('')}</div>
+      </div>
       <div id="searchResults"></div>`;
     const inp = document.getElementById('foodSearch');
     inp.oninput = ()=>{ doFoodSearch(inp.value); };
@@ -3799,7 +3982,7 @@ function doFoodSearch(q){
   const parsed = parseQuery(q);
   const mine = FOOD_DB.concat(S.customFoods);
   const seen = new Set(mine.map(f=>normFoodStr(f.name)));
-  const pool = mine.concat(PUBLIC_FOODS.filter(f=>!seen.has(normFoodStr(f.name))));
+  const pool = mine.concat(PUBLIC_FOODS.filter(f=>!seen.has(normFoodStr(f.name)))).filter(f=>foodMatchesFilters(f, foodFilters));
   let ranked;
   if(!parsed.len){
     ranked = rankFoods(pool).slice(0,15);
@@ -3810,11 +3993,12 @@ function doFoodSearch(q){
       .slice(0,40).map(x=>x.f);
   }
   const shown = new Set(ranked.map(f=>normFoodStr(f.name)));
-  /* онлайн-база подключается уже со второй буквы, а не с третьей */
-  const online = q.length>=2;
+  /* онлайн-база подключается уже со второй буквы, а не с третьей — пропускаем, если активны
+     фильтры вроде «Общие»/«Много калия», которым открытая база всё равно не соответствует */
+  const online = q.length>=2 && !foodFilters.has('pub');
   box.innerHTML = (ranked.length
       ? ranked.map(f=>foodResultHtml(f)).join('')
-      : (online ? '' : '<div class="empty-hint">Начни писать — найдём с полуслова</div>'))
+      : (online ? '' : (foodFilters.size ? '<div class="empty-hint">По этим фильтрам ничего не нашлось</div>' : '<div class="empty-hint">Начни писать — найдём с полуслова</div>')))
     + (online ? '<div class="result-source" id="offStatus"><span class="spinner"></span> Ищем в открытой базе…</div><div id="offResults"></div>' : '');
   if(!online) return;
   const my = ++offAbort;
@@ -3830,7 +4014,7 @@ function doFoodSearch(q){
       /* ранжируем онлайн-результаты тем же движком — OFF отдаёт много мусора.
          раньше топ-5 показывались всегда, даже с нулевым баллом совпадения —
          из-за этого в выдаче попадались продукты, похожие лишь одной буквой */
-      const scored = list.filter(f=>!shown.has(normFoodStr(f.name)))
+      const scored = list.filter(f=>!shown.has(normFoodStr(f.name)) && foodMatchesFilters(f, foodFilters))
         .map(f=>({f:f, s:foodScore(f, parsed)}))
         .filter(x=>x.s>0)
         .sort((a,b)=> b.s-a.s)
@@ -4232,10 +4416,10 @@ function dayEditorHtml(ds){
   const w = (S.workoutLog[ds]||[]).length;
   return `
     <div class="sheet-title">${fmtDate(ds)}</div>
-    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал • ${Math.round(dayMacro(ds,'p'))} белка, ${Math.round(dayMacro(ds,'c'))} углеводов, ${Math.round(dayMacro(ds,'f'))} жиров${w?` • тренировок: ${w}`:''}${daySteps(ds)?` • шагов: ${daySteps(ds).toLocaleString('ru-RU')}`:''}${dayBurned(ds)?` • сожжено ~ ${dayBurned(ds)} ккал`:''} • нажми на продукт, чтобы изменить граммовку</div>`
+    <div class="settings-hint" style="margin:0 0 12px">${dayTotal(ds)} / ${goal} ккал • ${Math.round(dayMacro(ds,'p'))} белка, ${Math.round(dayMacro(ds,'c'))} углеводов, ${Math.round(dayMacro(ds,'f'))} жиров${w?` • тренировок: ${w}`:''}${daySteps(ds)?` • шагов: ${daySteps(ds).toLocaleString('ru-RU')}`:''}${dayBurned(ds)?` • сожжено ~ ${dayBurned(ds)} ккал`:''}</div>`
     + (items.length ? items.map((it,i)=>`
       <div class="swipe-row">
-        <div class="log-item" data-act="editLogItem" data-arg="${i}">
+        <div class="log-item"${it.imported?'':' data-act="editLogItem"'} data-arg="${i}">
           <div class="log-emoji">${it.emoji||'🍽'}</div>
           <div style="flex:1;min-width:0"><div class="log-name">${escapeHtml(it.name)}${it.grams?` <span class="log-grams">${it.grams} г</span>`:''}</div><div class="log-meta">${it.time||''} · Б ${Math.round(it.p||0)} · У ${Math.round(it.c||0)} · Ж ${Math.round(it.f||0)}</div></div>
           <div class="log-kcal-wrap"><div class="log-kcal">${Math.round(it.kcal)}</div><div class="log-kcal-unit">ккал</div></div>
@@ -4482,11 +4666,11 @@ function applyImport(days){
   if(!days.length){ showToast('Нет ни одного дня с калориями'); return; }
   let added = 0;
   days.forEach(d=>{
-    if(!(S.foodLog[d.date]||[]).length){
-      S.foodLog[d.date] = [{ name:'Импорт истории', emoji:'📥', time:'12:00', kcal:d.kcal,
-        p:d.p, c:d.c, f:d.f, imported:true }]; // na/k не выдумываем — у истории импорта их нет
-      added++;
-    }
+    /* импорт истории — это «переписать день заново»: если там уже что-то записано
+       вручную, оно заменяется импортированной сводкой, а не складывается рядом */
+    S.foodLog[d.date] = [{ name:'Импорт истории', emoji:'📥', time:'12:00', kcal:d.kcal,
+      p:d.p, c:d.c, f:d.f, imported:true }]; // na/k не выдумываем — у истории импорта их нет
+    added++;
     if(d.weight) upsertWeight(d.date, d.weight);
   });
   save(true); haptic('ok'); closeSheet();
@@ -4529,7 +4713,7 @@ ACTIONS.applyRestore = ()=>{
   try{
     const data = JSON.parse(document.getElementById('restText').value);
     if(!data || typeof data!=='object' || !data.profile) throw new Error('bad');
-    S = Object.assign({ foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, skinLog:{}, retinoidLog:{}, skinFeeling:{}, theme:{dark:null,accent:'orange'}, goalShown:false }, data);
+    S = Object.assign({ foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, skinLog:{}, retinoidLog:{}, skinFeeling:{}, skinCheck:{}, skinExp:null, skinExpHistory:[], theme:{dark:null,accent:'orange'}, goalShown:false }, data);
     /* в бэкапе могут быть null/битые поля — раньше это роняло тему и рендер */
     normalizeState();
     S.uid = TG_UID || ''; S.stamps = {}; S.tomb = {};
@@ -4552,7 +4736,7 @@ ACTIONS.resetAll = ()=>{
     <button class="btn-secondary" style="margin-top:8px" data-act="closeModal">Отмена</button>`);
 };
 ACTIONS.confirmReset = async ()=>{
-  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, skinLog:{}, retinoidLog:{}, skinFeeling:{}, theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'' };
+  S = { profile:null, foodLog:{}, weightLog:[], customFoods:[], foodFreq:{}, waterLog:{}, stepsLog:{}, workoutLog:{}, skinLog:{}, retinoidLog:{}, skinFeeling:{}, skinCheck:{}, skinExp:null, skinExpHistory:[], theme:{dark:null,accent:'orange'}, goalShown:false, stamps:{}, tomb:{}, uid:TG_UID||'' };
   _snap = null;
   try{ localStorage.removeItem(LS_KEY); localStorage.removeItem('charge_v2'); }catch(e){}
   if(cloudOK){
