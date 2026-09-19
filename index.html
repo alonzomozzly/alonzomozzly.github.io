@@ -518,6 +518,8 @@ html.lg .modal{ background:var(--glass-bg); backdrop-filter:blur(30px) saturate(
 .plain-input{ width:100%; border:none; background:var(--card); border-radius:14px; padding:14px 16px; font-size:16px; color:var(--text); outline:none; box-shadow:var(--shadow); }
 textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
 .pill-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.filter-grid{ display:grid; grid-template-columns:1fr 1fr; }
+.filter-grid .pill{ text-align:center; }
 .pill{ border:2px solid transparent; background:var(--card); padding:9px 14px; border-radius:12px; font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); }
 .pill.active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-2); }
 .gram-pills{ display:flex; gap:8px; margin-top:10px; }
@@ -644,7 +646,7 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
    кода, пока на телефоне уже работает новая (отсюда расхождения в цветах
    аналитики, стрике и т.п. — это две разные версии кода, а не проблема данных).
    Метка ниже нужно менять при каждом обновлении файла. */
-const APP_VERSION = '2026-09-04.6';
+const APP_VERSION = '2026-09-04.7';
 /* раз в визит и раз в 5 минут сверяем версию с самим собой (без кэша); если
    на сервере лежит уже другой файл — значит открыт устаревший кэш, обновляемся */
 async function checkForUpdate(){
@@ -3700,7 +3702,7 @@ let foodFilters = new Set();
 const FOOD_FILTERS = [
   { k:'pub',       l:'Общие' },
   { k:'protein',   l:'Много белка' },
-  { k:'lowcal',    l:'Низкая калорийность' },
+  { k:'lowcal',    l:'Мало калорий' },
   { k:'potassium', l:'Много калия' },
   { k:'lowcarb',   l:'Мало углеводов' },
 ];
@@ -3763,7 +3765,7 @@ function renderFoodTabBody(){
       <input class="search-input" id="foodSearch" type="text" placeholder="Курица, гречка, творог…" autocomplete="off">
       <button class="filter-toggle-btn" data-act="toggleFoodFilters">Фильтры${activeN?' · '+activeN:''} <span class="filter-toggle-chev">▾</span></button>
       <div class="step-block" id="foodFiltersPanel">
-        <div class="pill-row">${FOOD_FILTERS.map(x=>`<button class="pill ${foodFilters.has(x.k)?'active':''}" data-act="toggleFoodFilter" data-arg="${x.k}">${x.l}</button>`).join('')}</div>
+        <div class="pill-row filter-grid">${FOOD_FILTERS.map(x=>`<button class="pill ${foodFilters.has(x.k)?'active':''}" data-act="toggleFoodFilter" data-arg="${x.k}">${x.l}</button>`).join('')}</div>
       </div>
       <div id="searchResults"></div>`;
     const inp = document.getElementById('foodSearch');
