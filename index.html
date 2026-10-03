@@ -646,7 +646,7 @@ textarea.plain-input{ min-height:120px; resize:vertical; line-height:1.5; }
    кода, пока на телефоне уже работает новая (отсюда расхождения в цветах
    аналитики, стрике и т.п. — это две разные версии кода, а не проблема данных).
    Метка ниже нужно менять при каждом обновлении файла. */
-const APP_VERSION = '2026-09-04.7';
+const APP_VERSION = '2026-09-04.9';
 /* раз в визит и раз в 5 минут сверяем версию с самим собой (без кэша); если
    на сервере лежит уже другой файл — значит открыт устаревший кэш, обновляемся */
 async function checkForUpdate(){
@@ -1301,7 +1301,7 @@ let ui = { tab:'home', settingsTab:'profile' };
    Проверка живёт на сервере (Supabase Edge Function) — там проверяется подпись
    Telegram initData и членство в канале через Bot API. Обойти через клиент нельзя.
    Пока ACCESS_FN_URL пуст — проверка выключена и приложение работает как раньше. */
-const ACCESS_FN_URL = 'https://clolqywsqbggnkyikjaq.supabase.co/functions/v1/check-access';
+const ACCESS_FN_URL = ''; /* пробный период/проверка подписки отключены — приложение всегда доступно */
 const ACCESS_LINK = ''; /* ВСТАВЬ ссылку на ПОКУПКУ доступа (бот оплаты/менеджер), а не инвайт в закрытый канал */
 /* кэш ответа о доступе живёт в localStorage устройства, а НЕ в синхронизируемом
    состоянии: иначе он раздувал облако и разъезжался между устройствами */
@@ -2026,20 +2026,22 @@ async function loadPublicFoods(){
   if(!publicDbReady()) return;
   _publicFoodsLoadedAt = Date.now();
   try{
-    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?select=name,emoji,kcal,p,c,f,na,k&order=id.desc&limit=2000',
+    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?select=name,emoji,kcal,p,c,f,na,k,official&order=id.desc&limit=2000',
       { headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key } });
     if(!res.ok) return;
     const rows = await res.json();
+    /* official=true — продукты, добавленные админом через «Тайлерджонку»: они ведут себя
+       как часть встроенной базы бота (без бейджа «общий»), а не как пользовательские */
     PUBLIC_FOODS = (rows||[]).map(r=>({ name:String(r.name||'').slice(0,80), emoji:r.emoji||'🍽',
       per100:{ kcal:Math.round(r.kcal||0), p:r1(r.p||0), c:r1(r.c||0), f:r1(r.f||0),
-        na: r.na!=null? Math.round(r.na): null, k: r.k!=null? Math.round(r.k): null }, pub:true }))
+        na: r.na!=null? Math.round(r.na): null, k: r.k!=null? Math.round(r.k): null }, pub: !r.official }))
       .filter(x=>x.name && x.per100.kcal>=0);
     /* если экран поиска сейчас открыт — обновляем результаты сразу, без перепечатывания запроса */
     const searchInp = document.getElementById('foodSearch');
     if(searchInp) doFoodSearch(searchInp.value);
   }catch(e){ /* нет сети — работаем с локальной базой */ }
 }
-async function publishFood(food){
+async function publishFood(food, official){
   if(!publicDbReady()) return false;
   /* Клиентская валидация + троттлинг. ВНИМАНИЕ: это НЕ защита — anon-ключ виден в клиенте.
      Реальню защиту от мусора должны обеспечивать RLS-политика и валидация в edge-функции на сервере. */
@@ -2050,17 +2052,55 @@ async function publishFood(food){
   if(!numOk(per.kcal,1000) || !numOk(per.p,100) || !numOk(per.c,100) || !numOk(per.f,100) || !numOk(per.na,20000) || !numOk(per.k,20000)){
     showToast('Проверь значения на 100 г'); return false;
   }
-  try{ const last = +(localStorage.getItem('cf_pub_ts')||0); if(Date.now()-last < 20000){ showToast('Слишком часто — подожди немного'); return false; } }catch(e){}
+  if(!official){ /* троттлинг публикации только для обычных пользователей — админ добавляет продукты пачками */
+    try{ const last = +(localStorage.getItem('cf_pub_ts')||0); if(Date.now()-last < 20000){ showToast('Слишком часто — подожди немного'); return false; } }catch(e){}
+  }
   try{
     const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods',
       { method:'POST',
         headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key, 'Content-Type':'application/json', Prefer:'return=minimal' },
         body: JSON.stringify({ name:name, emoji:food.emoji||'🍽', kcal:per.kcal,
-          p:per.p||0, c:per.c||0, f:per.f||0, na:per.na, k:per.k }) });
+          p:per.p||0, c:per.c||0, f:per.f||0, na:per.na, k:per.k, official:!!official }) });
     if(!res.ok) return false;
     try{ localStorage.setItem('cf_pub_ts', String(Date.now())); }catch(e){}
-    PUBLIC_FOODS.unshift(Object.assign({}, food, {pub:true}));
+    PUBLIC_FOODS.unshift(Object.assign({}, food, {pub: !official}));
     return true;
+  }catch(e){ return false; }
+}
+
+/* ================= Админское управление базой продуктов (только для isAdmin) =================
+   Требуется один раз выполнить в Supabase → SQL Editor:
+   alter table public_foods add column if not exists official boolean default false;
+   official=true — продукт ведёт себя как часть встроенной базы бота (без бейджа «общий»),
+   но физически хранится в той же таблице public_foods, что и продукты пользователей —
+   это и позволяет админу редактировать/удалять ЛЮБОЙ продукт из общей базы. */
+async function adminLoadFoods(){
+  if(!publicDbReady()) return [];
+  try{
+    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?select=id,name,emoji,kcal,p,c,f,na,k,official&order=id.desc&limit=1000',
+      { headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key } });
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){ return null; }
+}
+async function adminUpdateFood(id, food, official){
+  if(!publicDbReady()) return false;
+  const per = food.per100 || {};
+  try{
+    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?id=eq.'+id,
+      { method:'PATCH',
+        headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body: JSON.stringify({ name:food.name, emoji:food.emoji||'🍽', kcal:per.kcal,
+          p:per.p||0, c:per.c||0, f:per.f||0, na:per.na, k:per.k, official:!!official }) });
+    return res.ok;
+  }catch(e){ return false; }
+}
+async function adminDeleteFood(id){
+  if(!publicDbReady()) return false;
+  try{
+    const res = await fetch(PUBLIC_DB.url+'/rest/v1/public_foods?id=eq.'+id,
+      { method:'DELETE', headers:{ apikey:PUBLIC_DB.key, Authorization:'Bearer '+PUBLIC_DB.key } });
+    return res.ok;
   }catch(e){ return false; }
 }
 
@@ -4727,9 +4767,162 @@ ACTIONS.applyRestore = ()=>{
 };
 ACTIONS.openAdminPanel = ()=>{
   if(!isAdmin) return; /* подстраховка: даже если кто-то дёрнет action напрямую */
+  openSheet(`
+    <div class="sheet-title">Тайлерджонка</div>
+    <div class="card">
+      <button class="data-btn" data-act="openAdminFoods"><span class="data-btn-ic">${ic('food')}</span>База продуктов</button>
+      <button class="data-btn" data-act="openAdminStats"><span class="data-btn-ic">${ic('chart')}</span>Статистика и рассылка</button>
+    </div>`);
+};
+ACTIONS.openAdminStats = ()=>{
+  if(!isAdmin) return;
   if(tg && tg.openTelegramLink) tg.openTelegramLink(ADMIN_PANEL_LINK);
   else window.open(ADMIN_PANEL_LINK, '_blank');
 };
+
+/* ---- админский раздел «База продуктов» ---- */
+const EMOJI_PICK = ['🍗','🦃','🥩','🥓','🍖','🐟','🍤','🦑','🥚','🍳','🧀','🥛','🍚','🍛','🥣','🌾','🍝','🍞',
+  '🥐','🫓','🥦','🥔','🥕','🍅','🥒','🧅','🌽','🫘','🥑','🍄','🥜','🍌','🍎','🍊','🍇','🍓','🍒','🍑','🍉','🍯',
+  '🧂','🥫','🍫','🍪','🍰','🍦','🍿','🥤','☕️','🍺','🍷','🍕','🍔','🌭','🌯','🍣','🍲','🥟','🥗','💊','🍽'];
+let adminFoods = null, adminFoodsQuery = '';
+function adminFoodRowHtml(r){
+  const badge = r.official ? `<span class="pub-badge" style="background:linear-gradient(135deg,var(--blue),#26365c)">наш</span>` : `<span class="pub-badge">общий</span>`;
+  return `<button class="food-result" data-act="openAdminFoodForm" data-arg="${r.id}">
+    ${badge}
+    <div class="log-emoji">${r.emoji||'🍽'}</div>
+    <div class="food-r-info"><div class="food-r-name">${escapeHtml(r.name)}</div><div class="food-r-meta">${Math.round(r.kcal||0)} ккал · Б ${r1(r.p||0)} · У ${r1(r.c||0)} · Ж ${r1(r.f||0)} (на 100 г)</div></div>
+  </button>`;
+}
+function adminFoodsFiltered(){
+  const q = adminFoodsQuery.trim().toLowerCase();
+  return (adminFoods||[]).filter(r=> !q || String(r.name||'').toLowerCase().includes(q));
+}
+function adminFoodsHtml(){
+  const list = adminFoodsFiltered();
+  return `
+    <div class="sheet-title">База продуктов</div>
+    <button class="btn-primary" data-act="openAdminFoodForm">+ Добавить продукт</button>
+    <input class="search-input" id="adminFoodsSearch" type="text" placeholder="Поиск по названию…" value="${escapeHtml(adminFoodsQuery)}" style="margin-top:12px">
+    <div class="settings-hint" style="margin:0 0 10px">Всего в общей базе: ${(adminFoods||[]).length}</div>
+    <div id="adminFoodsList">${list.length? list.map(adminFoodRowHtml).join('') : '<div class="empty-hint">Ничего не нашлось</div>'}</div>`;
+}
+function bindAdminFoodsSearch(){
+  const inp = document.getElementById('adminFoodsSearch');
+  if(!inp) return;
+  inp.oninput = ()=>{
+    adminFoodsQuery = inp.value;
+    const box = document.getElementById('adminFoodsList');
+    if(!box) return;
+    const list = adminFoodsFiltered();
+    box.innerHTML = list.length? list.map(adminFoodRowHtml).join('') : '<div class="empty-hint">Ничего не нашлось</div>';
+  };
+}
+ACTIONS.openAdminFoods = async ()=>{
+  if(!isAdmin) return;
+  if(adminFoods==null){
+    openSheet(`<div class="sheet-title">База продуктов</div><div class="spinner"></div>`);
+    const rows = await adminLoadFoods();
+    if(rows==null){ showToast('Не удалось загрузить список — проверь связь'); adminFoods = []; }
+    else adminFoods = rows;
+  }
+  openSheet(adminFoodsHtml());
+  bindAdminFoodsSearch();
+};
+
+let adminFoodDraft = null;
+function adminFoodFormHtml(){
+  const d = adminFoodDraft;
+  return `
+    <div class="sheet-title">${d.id? 'Изменить продукт' : 'Новый продукт'}</div>
+    <div class="field-label">Эмодзи</div>
+    <div class="pill-row" id="adminEmojiGrid" style="font-size:18px">${EMOJI_PICK.map(e=>`<button class="pill ${e===d.emoji?'active':''}" data-emoji="${e}" style="padding:8px 11px">${e}</button>`).join('')}</div>
+    <input class="plain-input" id="adminEmojiCustom" type="text" placeholder="Или впиши своё эмодзи" value="${escapeHtml(d.emoji)}" style="margin-top:8px;text-align:center;font-size:18px">
+    <div class="field-label">Название</div>
+    <input class="plain-input" id="adminFName" type="text" placeholder="Название" value="${escapeHtml(d.name)}">
+    <div class="field-label">КБЖУ на 100 г</div>
+    <div class="import-row2">
+      <input class="plain-input" id="adminFKcal" type="text" inputmode="decimal" placeholder="ккал" value="${d.kcal!=null?d.kcal:''}">
+      <input class="plain-input" id="adminFP" type="text" inputmode="decimal" placeholder="белок, г" value="${d.p!=null?d.p:''}">
+      <input class="plain-input" id="adminFC" type="text" inputmode="decimal" placeholder="углеводы, г" value="${d.c!=null?d.c:''}">
+      <input class="plain-input" id="adminFF" type="text" inputmode="decimal" placeholder="жиры, г" value="${d.f!=null?d.f:''}">
+      <input class="plain-input" id="adminFNa" type="text" inputmode="decimal" placeholder="натрий, мг (если знаешь)" value="${d.na!=null?d.na:''}">
+      <input class="plain-input" id="adminFK" type="text" inputmode="decimal" placeholder="калий, мг (если знаешь)" value="${d.k!=null?d.k:''}">
+    </div>
+    <div class="theme-toggle-row" style="padding:12px 2px 2px" data-act="toggleAdminOfficial">
+      <div style="font-size:14.5px;font-weight:600">Наш продукт<div class="settings-hint" style="margin:2px 0 0">Без пометки «общий» — ведёт себя как встроенная база бота</div></div>
+      <div class="switch ${d.official?'on':''}" id="adminOfficialSwitch"><div class="knob"></div></div>
+    </div>
+    <button class="btn-primary" style="margin-top:14px" data-act="saveAdminFood">Сохранить</button>
+    ${d.id? '<button class="btn-secondary" style="margin-top:8px;color:var(--red)" data-act="deleteAdminFood">Удалить продукт</button>' : ''}
+    <button class="btn-secondary" style="margin-top:8px" data-act="backToAdminFoods">Назад к списку</button>`;
+}
+function bindAdminFoodForm(){
+  document.querySelectorAll('#adminEmojiGrid .pill').forEach(b=>{ b.onclick = ()=>{
+    document.querySelectorAll('#adminEmojiGrid .pill').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    adminFoodDraft.emoji = b.dataset.emoji;
+    const custom = document.getElementById('adminEmojiCustom'); if(custom) custom.value = b.dataset.emoji;
+    haptic('light');
+  };});
+  const custom = document.getElementById('adminEmojiCustom');
+  if(custom) custom.oninput = ()=>{
+    adminFoodDraft.emoji = custom.value.trim() || '🍽';
+    document.querySelectorAll('#adminEmojiGrid .pill').forEach(x=>x.classList.toggle('active', x.dataset.emoji===adminFoodDraft.emoji));
+  };
+}
+ACTIONS.openAdminFoodForm = (arg)=>{
+  if(!isAdmin) return;
+  const row = arg ? (adminFoods||[]).find(r=>String(r.id)===String(arg)) : null;
+  adminFoodDraft = row
+    ? { id:row.id, name:row.name||'', emoji:row.emoji||'🍽', kcal:Math.round(row.kcal||0), p:r1(row.p||0), c:r1(row.c||0), f:r1(row.f||0), na:row.na, k:row.k, official:!!row.official }
+    : { id:null, name:'', emoji:'🍽', kcal:null, p:null, c:null, f:null, na:null, k:null, official:true };
+  openSheet(adminFoodFormHtml());
+  bindAdminFoodForm();
+};
+ACTIONS.toggleAdminOfficial = ()=>{
+  adminFoodDraft.official = !adminFoodDraft.official;
+  const sw = document.getElementById('adminOfficialSwitch');
+  if(sw) sw.classList.toggle('on', adminFoodDraft.official);
+};
+ACTIONS.backToAdminFoods = ()=> ACTIONS.openAdminFoods();
+ACTIONS.saveAdminFood = async ()=>{
+  const d = adminFoodDraft;
+  const name = (document.getElementById('adminFName').value||'').trim();
+  const numv = id=>{ const v = document.getElementById(id).value; return v===''? null : parseFloat(String(v).replace(',','.')); };
+  const kcal = numv('adminFKcal');
+  const p = numv('adminFP')||0, c = numv('adminFC')||0, f = numv('adminFF')||0;
+  const na = numv('adminFNa'), k = numv('adminFK');
+  const emoji = ((document.getElementById('adminEmojiCustom')||{}).value||'🍽').trim() || '🍽';
+  if(!name){ showToast('Введи название'); return; }
+  if(!(kcal>=0)){ showToast('Введи калорийность на 100 г'); return; }
+  const food = { name, emoji, per100:{ kcal:Math.round(kcal), p:r1(p), c:r1(c), f:r1(f), na, k } };
+  showToast(d.id? 'Сохраняем…' : 'Публикуем…');
+  const ok = d.id ? await adminUpdateFood(d.id, food, d.official) : await publishFood(food, d.official);
+  if(!ok){ showToast('Не удалось сохранить'); return; }
+  haptic('ok'); showToast('Сохранено');
+  adminFoods = null;
+  loadPublicFoods(); /* обновляем пул поиска сразу для всех, не дожидаясь фонового обновления */
+  await ACTIONS.openAdminFoods();
+};
+ACTIONS.deleteAdminFood = ()=>{
+  const d = adminFoodDraft; if(!d || !d.id) return;
+  openModal(`
+    <div class="modal-title">Удалить «${escapeHtml(d.name)}»?</div>
+    <div class="modal-text">Продукт исчезнет из общей базы у всех пользователей. Действие необратимо</div>
+    <button class="btn-primary" style="margin-top:14px;background:var(--red)" data-act="confirmDeleteAdminFood">Да, удалить</button>
+    <button class="btn-secondary" style="margin-top:8px" data-act="closeModal">Отмена</button>`);
+};
+ACTIONS.confirmDeleteAdminFood = async ()=>{
+  const d = adminFoodDraft; if(!d || !d.id) return;
+  closeModal();
+  const ok = await adminDeleteFood(d.id);
+  if(!ok){ showToast('Не удалось удалить'); return; }
+  haptic('warn'); showToast('Удалено');
+  PUBLIC_FOODS = PUBLIC_FOODS.filter(f=> normFoodStr(f.name)!==normFoodStr(d.name));
+  adminFoods = null;
+  await ACTIONS.openAdminFoods();
+};
+
 ACTIONS.resetAll = ()=>{
   openModal(`
     <div class="modal-title">Сбросить всё?</div>
